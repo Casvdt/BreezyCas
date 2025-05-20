@@ -1,7 +1,9 @@
 const url = "https://api.openweathermap.org/data/2.5/weather?units=metric&q=    ";
 
-const APIKey = import.meta.env.API_KEY;
+// Import API key from config
+import { API_KEY } from './config.js';
 
+const APIKey = API_KEY;
 
 const searchBox = document.querySelector(".search input")
 const searchBtn = document.querySelector(".search button")
