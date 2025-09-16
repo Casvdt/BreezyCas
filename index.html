@@ -1,17 +1,21 @@
-<html lang="en">
+<html lang="nl">
 
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Breezy Cas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
 
-    <header>
-        <img src="./IMG/FROG.png" class="frogImg">
+    <header class="app-header">
+        <h1>Breezy Cas</h1>
+        <p class="subtitle">Live weerbericht op plaatsnaam!</p>
     </header>
 
     <main>
@@ -19,30 +23,118 @@
         <div class="card">
             <img src="./IMG/WEERAPPLOGO.png" class="logoImg">
             <div class="search">
-                <input type="text" placeholder="Enter city name" spellcheck="false">
-                <button><img src="./IMG/search.png"></button>
+                <input type="text" placeholder="Typ een plaatsnaam" spellcheck="false">
+                <button><img src="./IMG/search.png" alt="Zoeken"></button>
+            </div>
+            <ul class="suggestions" role="listbox" aria-label="Suggesties"></ul>
+            <div class="controls">
+                <button class="geo-btn" type="button">Gebruik mijn locatie</button>
+                <button class="units-toggle" type="button" aria-label="Eenheden wisselen">°C / °F</button>
+                <button class="theme-toggle" type="button" aria-label="Thema wisselen">🌗</button>
+            </div>
+            <div class="favorites">
+                <div class="fav-title">Favorieten</div>
+                <div class="fav-list"></div>
+                <button class="fav-toggle" type="button" aria-label="Voeg toe aan favorieten">☆ Bewaar</button>
             </div>
             <div class="error">
-                <p>Invalid City Name</p>
+                <p>Ongeldige plaatsnaam</p>
+            </div>
+            <div class="loading" aria-hidden="true">
+                <div class="spinner" role="status" aria-label="Laden"></div>
             </div>
             <div class="weather">
-                <img src="./IMG/rain.png" class="weather-icon">
+                <img src="./IMG/rain.png" class="weather-icon" alt="Weericoon">
                 <h1 class="temp">-1°C</h1>
                 <h2 class="city">Wateringen</h2>
+                <p class="desc">Licht bewolkt</p>
                 <div class="details">
-                    <div class="col"></div>
-                    <img src="./IMG/humidity.png">
-                    <div>
-                        <p class="humidity">50%</p>
-                        <p>Humidity</p>
+                    <div class="metric">
+                        <img src="./IMG/humidity.png" alt="Luchtvochtigheid">
+                        <div class="metric-text">
+                            <p class="humidity value">50%</p>
+                            <p class="label">Luchtvochtigheid</p>
+                        </div>
                     </div>
-                    <div class="col"></div>
-                    <img src="./IMG/wind.png">
-                    <div>
-                        <p class="wind">15 km/h</p>
-                        <p>Wind Speed</p>
+                    <div class="metric">
+                        <img src="./IMG/wind.png" alt="Windsnelheid">
+                        <div class="metric-text">
+                            <p class="wind value">15 km/u</p>
+                            <p class="label">Windsnelheid • <span class="winddir">-</span></p>
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <img src="./IMG/clear.png" alt="Gevoelstemperatuur">
+                        <div class="metric-text">
+                            <p class="feels value">-</p>
+                            <p class="label">Gevoelstemperatuur</p>
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <img src="./IMG/rain.png" alt="Neerslagkans">
+                        <div class="metric-text">
+                            <p class="precip value">-</p>
+                            <p class="label">Neerslagkans</p>
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <img src="./IMG/mist.png" alt="Zicht">
+                        <div class="metric-text">
+                            <p class="visibility value">-</p>
+                            <p class="label">Zicht</p>
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <img src="./IMG/drizzle.png" alt="Luchtdruk">
+                        <div class="metric-text">
+                            <p class="pressure value">-</p>
+                            <p class="label">Luchtdruk</p>
+                        </div>
                     </div>
                 </div>
+                <div class="astro">
+                    <div class="pill sunrise">Zonsopkomst: <span class="sunrise-time">-</span></div>
+                    <div class="pill sunset">Zonsondergang: <span class="sunset-time">-</span></div>
+                </div>
+                <div class="forecast">
+                    <h3>Verwachting (5 dagen)</h3>
+                    <div class="forecast-grid">
+                        <div class="forecast-day">
+                            <div class="day-name">Ma</div>
+                            <img src="./IMG/clear.png" alt="">
+                            <div class="day-temps">12° / 7°</div>
+                        </div>
+                        <div class="forecast-day">
+                            <div class="day-name">Di</div>
+                            <img src="./IMG/clouds.png" alt="">
+                            <div class="day-temps">10° / 6°</div>
+                        </div>
+                        <div class="forecast-day">
+                            <div class="day-name">Wo</div>
+                            <img src="./IMG/rain.png" alt="">
+                            <div class="day-temps">9° / 5°</div>
+                        </div>
+                        <div class="forecast-day">
+                            <div class="day-name">Do</div>
+                            <img src="./IMG/drizzle.png" alt="">
+                            <div class="day-temps">11° / 6°</div>
+                        </div>
+                        <div class="forecast-day">
+                            <div class="day-name">Vr</div>
+                            <img src="./IMG/mist.png" alt="">
+                            <div class="day-temps">8° / 4°</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="hourly">
+                    <h3>Uurlijkse verwachting</h3>
+                    <div class="hour-nav">
+                        <button class="hour-left" type="button">←</button>
+                        <button class="hour-right" type="button">→</button>
+                    </div>
+                    <div class="hourly-scroll"></div>
+                </div>
+                <div class="last-updated">Laatst bijgewerkt: <span class="updated-at">-</span></div>
             </div>
         </div>
     </main>

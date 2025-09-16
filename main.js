@@ -1,4 +1,6 @@
-const url = "https://api.openweathermap.org/data/2.5/weather?units=metric&q=";
+const url = "https://api.openweathermap.org/data/2.5/weather?units=metric&lang=nl&q=";
+const forecastUrl = "https://api.openweathermap.org/data/2.5/forecast?units=metric&lang=nl&q=";
+const reverseGeoUrl = "https://api.openweathermap.org/geo/1.0/reverse";
 
 // Import API key from config
 import { API_KEY } from './config.js';
@@ -8,6 +10,89 @@ const APIKey = API_KEY;
 const searchBox = document.querySelector(".search input")
 const searchBtn = document.querySelector(".search button")
 const weatherIcon = document.querySelector(".weather-icon")
+const loadingEl = document.querySelector(".loading")
+const weatherEl = document.querySelector(".weather")
+const errorEl = document.querySelector(".error")
+const forecastGridEl = document.querySelector(".forecast-grid")
+const geoBtn = document.querySelector(".geo-btn")
+const themeToggle = document.querySelector(".theme-toggle")
+const unitsToggle = document.querySelector(".units-toggle")
+const suggestionsEl = document.querySelector(".suggestions")
+const favListEl = document.querySelector(".fav-list")
+const favToggleEl = document.querySelector(".fav-toggle")
+const hourlyScrollEl = document.querySelector(".hourly-scroll")
+const hourLeftBtn = document.querySelector(".hour-left")
+const hourRightBtn = document.querySelector(".hour-right")
+
+// Units state
+let currentUnits = localStorage.getItem('units') || 'metric'; // 'metric' | 'imperial'
+
+function toF(c) { return Math.round((c * 9/5) + 32); }
+function mpsToKmh(ms) { return Math.round(ms * 3.6); }
+function mpsToMph(ms) { return Math.round(ms * 2.23694); }
+function formatTempC(c) { return Math.round(c) + "°C"; }
+function formatTemp(c) { return currentUnits === 'metric' ? formatTempC(c) : (toF(c) + "°F"); }
+function formatWind(ms) {
+    if (currentUnits === 'metric') return mpsToKmh(ms) + " km/u";
+    return mpsToMph(ms) + " mph";
+}
+function beaufortFromMps(ms) {
+    const thresholds = [0.3,1.6,3.4,5.5,8.0,10.8,13.9,17.2,20.8,24.5,28.5,32.7];
+    let b = 0; while (b < thresholds.length && ms >= thresholds[b]) b++; return b;
+}
+function degToWindDir(deg){
+    const dirs = ['N','NNO','NO','ONO','O','OZO','ZO','ZZO','Z','ZZW','ZW','WZW','W','WNW','NW','NNW'];
+    const i = Math.round(((deg % 360) / 22.5)) % 16; return dirs[i];
+}
+
+function updateAstro(sys, coord) {
+    if (!sys) return;
+    const sunriseEl = document.querySelector('.sunrise-time');
+    const sunsetEl = document.querySelector('.sunset-time');
+    if (sunriseEl && sys.sunrise) sunriseEl.textContent = new Date(sys.sunrise * 1000).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    if (sunsetEl && sys.sunset) sunsetEl.textContent = new Date(sys.sunset * 1000).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    // UV requires One Call API; placeholder '-' unless we add that endpoint later
+}
+
+async function fetchAndUpdateUV(lat, lon) {
+    try {
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&units=metric&lang=nl&exclude=minutely,alerts&appid=${APIKey}`);
+        if (!res.ok) return; // silently skip if not allowed on this key
+        const data = await res.json();
+        const uvEl = document.querySelector('.uv-index');
+        if (!uvEl) return;
+        const uvi = (data.current && typeof data.current.uvi === 'number') ? data.current.uvi : (data.daily && data.daily[0] ? data.daily[0].uvi : null);
+        if (typeof uvi === 'number') {
+            uvEl.textContent = Math.round(uvi);
+        }
+    } catch { /* ignore */ }
+}
+
+// Auto refresh configuration
+const REFRESH_MS = 60000; // 60 seconds
+let refreshTimer = null;
+let lastQuery = { type: null, city: null, lat: null, lon: null };
+
+function stopAutoRefresh() {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh();
+    refreshTimer = setInterval(refreshCurrent, REFRESH_MS);
+}
+
+async function refreshCurrent() {
+    if (document.hidden) return; // avoid refreshing when tab is hidden
+    if (lastQuery.type === 'city' && lastQuery.city) {
+        await checkWeather(lastQuery.city);
+    } else if (lastQuery.type === 'coords' && lastQuery.lat != null && lastQuery.lon != null) {
+        await updateByCoords(lastQuery.lat, lastQuery.lon);
+    }
+}
 
 async function checkWeather(city) {
     const trimmedCity = city.trim();
@@ -15,11 +100,17 @@ async function checkWeather(city) {
         return;
     }
     try {
+        // Show loading, hide previous states
+        if (loadingEl) loadingEl.classList.add("show");
+        if (errorEl) errorEl.style.display = "none";
+        if (weatherEl) weatherEl.style.display = "none";
+
         const response = await fetch(url + encodeURIComponent(trimmedCity) + `&appid=${APIKey}`);
 
         if (response.status === 404) {
-            document.querySelector(".error").style.display = "block";
-            document.querySelector(".weather").style.display = "none";
+            if (errorEl) errorEl.style.display = "block";
+            if (weatherEl) weatherEl.style.display = "none";
+            if (loadingEl) loadingEl.classList.remove("show");
             return;
         }
 
@@ -29,9 +120,25 @@ async function checkWeather(city) {
 
         const data = await response.json();
         document.querySelector(".city").innerHTML = data.name;
-        document.querySelector(".temp").innerHTML = Math.round(data.main.temp) + "°C";
+        document.querySelector(".temp").innerHTML = formatTemp(data.main.temp);
         document.querySelector(".humidity").innerHTML = data.main.humidity + "%";
-        document.querySelector(".wind").innerHTML = data.wind.speed + " km/h";
+        const windText = formatWind(data.wind.speed) + ` (Bft ${beaufortFromMps(data.wind.speed)})`;
+        document.querySelector(".wind").innerHTML = windText;
+        const winddirEl = document.querySelector('.winddir');
+        if (winddirEl && typeof data.wind.deg === 'number') winddirEl.textContent = degToWindDir(data.wind.deg);
+        const visEl = document.querySelector('.visibility');
+        if (visEl && typeof data.visibility === 'number') visEl.textContent = (data.visibility/1000).toFixed(1) + ' km';
+        const presEl = document.querySelector('.pressure');
+        if (presEl && data.main && typeof data.main.pressure === 'number') presEl.textContent = data.main.pressure + ' hPa';
+        const feelsEl = document.querySelector('.feels');
+        if (feelsEl && data.main && typeof data.main.feels_like === 'number') {
+            feelsEl.textContent = formatTemp(data.main.feels_like);
+        }
+        if (data.weather && data.weather[0] && data.weather[0].description) {
+            const d = data.weather[0].description;
+            const descEl = document.querySelector('.desc');
+            if (descEl) descEl.textContent = d.charAt(0).toUpperCase() + d.slice(1);
+        }
 
         if (data.weather[0].main == "Clouds") {
             weatherIcon.src = "IMG/clouds.png";
@@ -49,14 +156,117 @@ async function checkWeather(city) {
             weatherIcon.src = "IMG/mist.png";
         }
 
-        document.querySelector(".error").style.display = "none";
-        document.querySelector(".weather").style.display = "block";
+        if (errorEl) errorEl.style.display = "none";
+        if (weatherEl) {
+            weatherEl.style.display = "block";
+            weatherEl.classList.remove("show");
+            // trigger reflow for animation restart
+            void weatherEl.offsetWidth;
+            weatherEl.classList.add("show");
+        }
+        const updatedAt = document.querySelector('.updated-at');
+        if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+        // Astro and UV
+        updateAstro(data.sys, data.coord);
+        if (data.coord && typeof data.coord.lat === 'number' && typeof data.coord.lon === 'number') {
+            fetchAndUpdateUV(data.coord.lat, data.coord.lon);
+        }
+        // Fetch and render 5-day forecast (also updates precip chance in details)
+        renderForecastByCity(trimmedCity);
+        // Remember last query and (re)start auto refresh
+        lastQuery = { type: 'city', city: trimmedCity, lat: null, lon: null };
+        startAutoRefresh();
     } catch (error) {
-        document.querySelector(".error").style.display = "block";
-        document.querySelector(".weather").style.display = "none";
+        if (errorEl) errorEl.style.display = "block";
+        if (weatherEl) weatherEl.style.display = "none";
         // Optionally log error to console for debugging
         console.error(error);
     }
+    finally {
+        if (loadingEl) loadingEl.classList.remove("show");
+    }
+}
+
+async function renderForecastByCity(city) {
+    if (!forecastGridEl) return;
+    try {
+        const res = await fetch(forecastUrl + encodeURIComponent(city) + `&appid=${APIKey}`);
+        if (!res.ok) throw new Error("Forecast request failed");
+        const data = await res.json();
+        // Update precip chance in details from the next forecast slice if available
+        const precipEl = document.querySelector('.precip');
+        if (precipEl && data.list && data.list.length) {
+            const pop = data.list[0].pop; // probability of precipitation (0..1)
+            if (typeof pop === 'number') {
+                precipEl.textContent = Math.round(pop * 100) + "%";
+            }
+        }
+        // OpenWeather 3-hourly forecast; pick one snapshot per day at noon
+        const byDay = {};
+        for (const item of data.list) {
+            const date = new Date(item.dt * 1000);
+            const key = date.toISOString().slice(0,10);
+            const hour = date.getUTCHours();
+            if (!byDay[key] || Math.abs(hour - 12) < Math.abs(byDay[key].hour - 12)) {
+                byDay[key] = { item, hour };
+            }
+            if (!byDay[key].maxPop || (typeof item.pop === 'number' && item.pop > byDay[key].maxPop)) {
+                byDay[key].maxPop = item.pop || 0;
+            }
+        }
+        const days = Object.keys(byDay).slice(0,5);
+        forecastGridEl.innerHTML = "";
+        for (const key of days) {
+            const { item, maxPop } = byDay[key];
+            const date = new Date(item.dt * 1000);
+            const dayName = date.toLocaleDateString("nl-NL", { weekday: "short" });
+            const min = Math.round(item.main.temp_min);
+            const max = Math.round(item.main.temp_max);
+            const main = item.weather && item.weather[0] ? item.weather[0].main : "Clear";
+            const iconSrc = getIconForMain(main);
+            const el = document.createElement("div");
+            el.className = "forecast-day";
+            el.innerHTML = `
+                <div class="day-name">${dayName}</div>
+                <img src="${iconSrc}" alt="${main}">
+                <div class="day-temps">${formatTemp(max)} / ${formatTemp(min)}${typeof maxPop==='number' ? ` • ${Math.round(maxPop*100)}%` : ''}</div>
+            `;
+            forecastGridEl.appendChild(el);
+        }
+
+        // Hourly section (next ~12 entries)
+        if (hourlyScrollEl) {
+            hourlyScrollEl.innerHTML = "";
+            const hours = data.list.slice(0, 12);
+            for (const h of hours) {
+                const d = new Date(h.dt * 1000);
+                const time = d.toLocaleTimeString("nl-NL", { hour: '2-digit', minute: '2-digit' });
+                const main = h.weather && h.weather[0] ? h.weather[0].main : "Clear";
+                const iconSrc = getIconForMain(main);
+                const card = document.createElement('div');
+                card.className = 'hour-card';
+                card.innerHTML = `
+                    <div class="t">${time}</div>
+                    <img src="${iconSrc}" alt="${main}">
+                    <div class="v">${formatTemp(h.main.temp)}</div>
+                    <div class="p">${typeof h.pop==='number' ? Math.round(h.pop*100)+"%" : ''}</div>
+                `;
+                hourlyScrollEl.appendChild(card);
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function getIconForMain(main) {
+    if (main === "Clouds") return "IMG/clouds.png";
+    if (main === "Clear") return "IMG/clear.png";
+    if (main === "Rain") return "IMG/rain.png";
+    if (main === "Drizzle") return "IMG/drizzle.png";
+    if (main === "Mist") return "IMG/mist.png";
+    if (main === "Snow") return "IMG/snow.png";
+    return "IMG/clear.png";
 }
 
 
@@ -72,4 +282,327 @@ searchBox.addEventListener("keydown", (event) => {
         checkWeather(searchBox.value);
     }
 })
+
+// Geolocation
+if (geoBtn && navigator.geolocation) {
+    geoBtn.addEventListener("click", () => {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            try {
+                if (loadingEl) loadingEl.classList.add("show");
+                if (errorEl) errorEl.style.display = "none";
+                if (weatherEl) weatherEl.style.display = "none";
+                const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?units=metric&lang=nl&lat=${latitude}&lon=${longitude}&appid=${APIKey}`);
+                if (!res.ok) throw new Error("Geo weather failed");
+                const data = await res.json();
+                const niceName = await reverseGeocode(latitude, longitude);
+                document.querySelector(".city").innerHTML = niceName || data.name;
+                document.querySelector(".temp").innerHTML = formatTemp(data.main.temp);
+                document.querySelector(".humidity").innerHTML = data.main.humidity + "%";
+                document.querySelector(".wind").innerHTML = formatWind(data.wind.speed) + ` (Bft ${beaufortFromMps(data.wind.speed)})`;
+                const winddirEl2 = document.querySelector('.winddir');
+                if (winddirEl2 && typeof data.wind.deg === 'number') winddirEl2.textContent = degToWindDir(data.wind.deg);
+                const visEl2 = document.querySelector('.visibility');
+                if (visEl2 && typeof data.visibility === 'number') visEl2.textContent = (data.visibility/1000).toFixed(1) + ' km';
+                const presEl2 = document.querySelector('.pressure');
+                if (presEl2 && data.main && typeof data.main.pressure === 'number') presEl2.textContent = data.main.pressure + ' hPa';
+                const feelsEl = document.querySelector('.feels');
+                if (feelsEl && data.main && typeof data.main.feels_like === 'number') {
+                    feelsEl.textContent = formatTemp(data.main.feels_like);
+                }
+                weatherIcon.src = getIconForMain(data.weather[0].main);
+                if (data.weather && data.weather[0] && data.weather[0].description) {
+                    const d = data.weather[0].description;
+                    const descEl = document.querySelector('.desc');
+                    if (descEl) descEl.textContent = d.charAt(0).toUpperCase() + d.slice(1);
+                }
+                if (weatherEl) {
+                    weatherEl.style.display = "block";
+                    weatherEl.classList.remove("show");
+                    void weatherEl.offsetWidth;
+                    weatherEl.classList.add("show");
+                }
+                const updatedAt = document.querySelector('.updated-at');
+                if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+                updateAstro(data.sys, data.coord);
+                fetchAndUpdateUV(latitude, longitude);
+                renderForecastByCoords(latitude, longitude);
+                // Remember last coords and (re)start auto refresh
+                lastQuery = { type: 'coords', city: null, lat: latitude, lon: longitude };
+                startAutoRefresh();
+            } catch (e) {
+                if (errorEl) errorEl.style.display = "block";
+                console.error(e);
+            } finally {
+                if (loadingEl) loadingEl.classList.remove("show");
+            }
+        }, () => {
+            // If denied, do nothing
+        });
+    });
+}
+
+async function renderForecastByCoords(lat, lon) {
+    if (!forecastGridEl) return;
+    try {
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?units=metric&lang=nl&lat=${lat}&lon=${lon}&appid=${APIKey}`);
+        if (!res.ok) throw new Error("Forecast request failed");
+        const data = await res.json();
+        const precipEl = document.querySelector('.precip');
+        if (precipEl && data.list && data.list.length) {
+            const pop = data.list[0].pop;
+            if (typeof pop === 'number') {
+                precipEl.textContent = Math.round(pop * 100) + "%";
+            }
+        }
+        const byDay = {};
+        for (const item of data.list) {
+            const date = new Date(item.dt * 1000);
+            const key = date.toISOString().slice(0,10);
+            const hour = date.getUTCHours();
+            if (!byDay[key] || Math.abs(hour - 12) < Math.abs(byDay[key].hour - 12)) {
+                byDay[key] = { item, hour };
+            }
+            if (!byDay[key].maxPop || (typeof item.pop === 'number' && item.pop > byDay[key].maxPop)) {
+                byDay[key].maxPop = item.pop || 0;
+            }
+        }
+        const days = Object.keys(byDay).slice(0,5);
+        forecastGridEl.innerHTML = "";
+        for (const key of days) {
+            const { item, maxPop } = byDay[key];
+            const date = new Date(item.dt * 1000);
+            const dayName = date.toLocaleDateString("nl-NL", { weekday: "short" });
+            const min = Math.round(item.main.temp_min);
+            const max = Math.round(item.main.temp_max);
+            const main = item.weather && item.weather[0] ? item.weather[0].main : "Clear";
+            const iconSrc = getIconForMain(main);
+            const el = document.createElement("div");
+            el.className = "forecast-day";
+            el.innerHTML = `
+                <div class="day-name">${dayName}</div>
+                <img src="${iconSrc}" alt="${main}">
+                <div class="day-temps">${formatTemp(max)} / ${formatTemp(min)}${typeof maxPop==='number' ? ` • ${Math.round(maxPop*100)}%` : ''}</div>
+            `;
+            forecastGridEl.appendChild(el);
+        }
+
+        // Hourly
+        if (hourlyScrollEl) {
+            hourlyScrollEl.innerHTML = "";
+            const hours = data.list.slice(0, 12);
+            for (const h of hours) {
+                const d = new Date(h.dt * 1000);
+                const time = d.toLocaleTimeString("nl-NL", { hour: '2-digit', minute: '2-digit' });
+                const main = h.weather && h.weather[0] ? h.weather[0].main : "Clear";
+                const iconSrc = getIconForMain(main);
+                const card = document.createElement('div');
+                card.className = 'hour-card';
+                card.innerHTML = `
+                    <div class=\"t\">${time}</div>
+                    <img src=\"${iconSrc}\" alt=\"${main}\">
+                    <div class=\"v\">${formatTemp(h.main.temp)}</div>
+                `;
+                hourlyScrollEl.appendChild(card);
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// Helper to update UI by coordinates (used by auto refresh)
+async function updateByCoords(lat, lon) {
+    try {
+        if (loadingEl) loadingEl.classList.add("show");
+        if (errorEl) errorEl.style.display = "none";
+        if (weatherEl) weatherEl.style.display = "none";
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?units=metric&lang=nl&lat=${lat}&lon=${lon}&appid=${APIKey}`);
+        if (!res.ok) throw new Error("Geo weather failed");
+        const data = await res.json();
+        const niceName = await reverseGeocode(lat, lon);
+        document.querySelector(".city").innerHTML = niceName || data.name;
+        document.querySelector(".temp").innerHTML = formatTemp(data.main.temp);
+        document.querySelector(".humidity").innerHTML = data.main.humidity + "%";
+        document.querySelector(".wind").innerHTML = formatWind(data.wind.speed) + ` (Bft ${beaufortFromMps(data.wind.speed)})`;
+        const winddirEl3 = document.querySelector('.winddir');
+        if (winddirEl3 && typeof data.wind.deg === 'number') winddirEl3.textContent = degToWindDir(data.wind.deg);
+        const visEl3 = document.querySelector('.visibility');
+        if (visEl3 && typeof data.visibility === 'number') visEl3.textContent = (data.visibility/1000).toFixed(1) + ' km';
+        const presEl3 = document.querySelector('.pressure');
+        if (presEl3 && data.main && typeof data.main.pressure === 'number') presEl3.textContent = data.main.pressure + ' hPa';
+        const feelsEl = document.querySelector('.feels');
+        if (feelsEl && data.main && typeof data.main.feels_like === 'number') {
+            feelsEl.textContent = formatTemp(data.main.feels_like);
+        }
+        weatherIcon.src = getIconForMain(data.weather[0].main);
+        if (data.weather && data.weather[0] && data.weather[0].description) {
+            const d = data.weather[0].description;
+            const descEl = document.querySelector('.desc');
+            if (descEl) descEl.textContent = d.charAt(0).toUpperCase() + d.slice(1);
+        }
+        if (weatherEl) {
+            weatherEl.style.display = "block";
+            weatherEl.classList.remove("show");
+            void weatherEl.offsetWidth;
+            weatherEl.classList.add("show");
+        }
+        const updatedAt = document.querySelector('.updated-at');
+        if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+        await renderForecastByCoords(lat, lon);
+        fetchAndUpdateUV(lat, lon);
+    } catch (e) {
+        if (errorEl) errorEl.style.display = "block";
+        console.error(e);
+    } finally {
+        if (loadingEl) loadingEl.classList.remove("show");
+    }
+}
+
+// Pause auto refresh when tab hidden, resume when visible
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        stopAutoRefresh();
+    } else if (lastQuery.type) {
+        startAutoRefresh();
+        refreshCurrent();
+    }
+});
+
+async function reverseGeocode(lat, lon) {
+    try {
+        const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=5&appid=${APIKey}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length) {
+            // Prefer city > town > village > municipality > state > county > name
+            const preferOrder = [
+                'city', 'town', 'village', 'municipality', 'state', 'county'
+            ];
+            let chosen = data.find(p => preferOrder.includes(p?.type));
+            if (!chosen) chosen = data[0];
+            const localName = chosen.local_names && chosen.local_names.nl ? chosen.local_names.nl : chosen.name;
+            return localName || chosen.name || null;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+// Theme toggle
+if (themeToggle) {
+    const saved = localStorage.getItem("theme") || "dark";
+    if (saved === "light") document.body.classList.add("light");
+    themeToggle.addEventListener("click", () => {
+        document.body.classList.toggle("light");
+        localStorage.setItem("theme", document.body.classList.contains("light") ? "light" : "dark");
+    });
+}
+
+// Units toggle
+if (unitsToggle) {
+    if (currentUnits === 'imperial') unitsToggle.textContent = '°F / °C';
+    unitsToggle.addEventListener('click', () => {
+        currentUnits = currentUnits === 'metric' ? 'imperial' : 'metric';
+        localStorage.setItem('units', currentUnits);
+        unitsToggle.textContent = currentUnits === 'metric' ? '°C / °F' : '°F / °C';
+        // Re-render using last query
+        refreshCurrent();
+    });
+}
+
+// Favorites
+function getFavorites(){
+    try { return JSON.parse(localStorage.getItem('favorites')||'[]'); } catch { return []; }
+}
+function setFavorites(list){ localStorage.setItem('favorites', JSON.stringify(list)); }
+function renderFavorites(){
+    if (!favListEl) return;
+    const favs = getFavorites();
+    favListEl.innerHTML = '';
+    favs.forEach(city => {
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = city;
+        nameSpan.addEventListener('click', () => checkWeather(city));
+        const rm = document.createElement('span');
+        rm.className = 'rm';
+        rm.textContent = '×';
+        rm.title = 'Verwijder';
+        rm.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const list = getFavorites().filter(c => c !== city);
+            setFavorites(list);
+            renderFavorites();
+        });
+        chip.appendChild(nameSpan);
+        chip.appendChild(rm);
+        favListEl.appendChild(chip);
+    });
+}
+renderFavorites();
+if (favToggleEl) {
+    favToggleEl.addEventListener('click', () => {
+        const city = document.querySelector('.city')?.textContent?.trim();
+        if (!city) return;
+        const favs = getFavorites();
+        if (!favs.includes(city)) {
+            favs.push(city);
+            setFavorites(favs);
+            renderFavorites();
+            favToggleEl.textContent = '★ Bewaard';
+            setTimeout(()=>{ favToggleEl.textContent = '☆ Bewaar'; }, 1000);
+        }
+    });
+}
+
+// Deep link (?city=...)
+const params = new URLSearchParams(location.search);
+const initialCity = params.get('city');
+if (initialCity) {
+    checkWeather(initialCity);
+}
+
+// Autocomplete suggestions using OW Geocoding
+async function fetchSuggestions(q){
+    try {
+        const res = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(q)}&limit=5&appid=${APIKey}`);
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+if (suggestionsEl && searchBox) {
+    let debounce;
+    searchBox.addEventListener('input', () => {
+        const q = searchBox.value.trim();
+        clearTimeout(debounce);
+        if (!q) { suggestionsEl.innerHTML = ''; return; }
+        debounce = setTimeout(async () => {
+            const results = await fetchSuggestions(q);
+            suggestionsEl.innerHTML = '';
+            results.forEach(r => {
+                const li = document.createElement('li');
+                const name = r.local_names && r.local_names.nl ? r.local_names.nl : r.name;
+                li.textContent = `${name}${r.state? ', ' + r.state: ''}${r.country? ' ('+r.country+')':''}`;
+                li.addEventListener('click', () => {
+                    searchBox.value = name;
+                    suggestionsEl.innerHTML = '';
+                    checkWeather(name);
+                });
+                suggestionsEl.appendChild(li);
+            });
+        }, 200);
+    });
+}
+
+// Hourly nav scrolling
+function scrollHourly(direction){
+    if (!hourlyScrollEl) return;
+    const cardWidth = hourlyScrollEl.firstElementChild ? hourlyScrollEl.firstElementChild.getBoundingClientRect().width + 12 : 120;
+    hourlyScrollEl.scrollBy({ left: direction * cardWidth * 2, behavior: 'smooth' });
+}
+if (hourLeftBtn) hourLeftBtn.addEventListener('click', () => scrollHourly(-1));
+if (hourRightBtn) hourRightBtn.addEventListener('click', () => scrollHourly(1));
 
