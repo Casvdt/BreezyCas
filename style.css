@@ -56,6 +56,12 @@ body {
     justify-content: center;
     margin-top: 12px;
 }
+.lang-switch{ display: inline-flex; gap: 6px; }
+.lang-btn{ background: rgba(255,255,255,0.14); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 6px 8px; cursor: pointer; }
+.lang-btn.active{ box-shadow: 0 0 0 2px rgba(255,255,255,0.35) inset; }
+.lang-switch-top{ display: flex; justify-content: center; margin: 8px 0 6px; }
+body.light .lang-btn{ background: rgba(10,34,53,0.08); color: #0a2235; border-color: rgba(10,34,53,0.25); }
+body.light .lang-btn.active{ box-shadow: 0 0 0 2px rgba(10,34,53,0.35) inset; }
 .controls .geo-btn,
 .controls .units-toggle,
 .controls .theme-toggle{
@@ -249,25 +255,19 @@ body {
 .forecast-day img{ width: 36px; height: 36px; }
 .forecast-day .day-temps{ font-size: 13px; margin-top: 6px; }
 
-.hourly{ margin-top: 20px; text-align: left; position: relative; }
+.hourly{ margin-top: 20px; text-align: left; }
 .hourly h3{ font-size: 16px; font-weight: 600; margin-bottom: 10px; }
-.hourly-scroll{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax(90px, 1fr); gap: 12px; overflow-x: auto; padding: 8px 0 12px; scroll-behavior: smooth; scroll-snap-type: x mandatory; }
-.hour-card{ background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.25); border-radius: 14px; padding: 10px; text-align: center; min-width: 90px; scroll-snap-align: center; box-shadow: 0 6px 16px rgba(0,0,0,0.25); }
+.hourly-scroll{ display: none; }
+.hour-card{ display: none; }
 .hour-card .t{ font-size: 12px; opacity: 0.9; }
 .hour-card img{ width: 32px; height: 32px; }
 .hour-card .v{ font-size: 13px; margin-top: 4px; }
 .hour-card .p{ font-size: 11px; opacity: 0.85; margin-top: 2px; }
 
-/* Edge gradient fades */
-.hourly::before, .hourly::after{
-    content: "";
-    position: absolute; top: 34px; bottom: 6px; width: 28px; pointer-events: none;
-}
-.hourly::before{ left: 0; background: linear-gradient(90deg, rgba(34,34,34,1), rgba(34,34,34,0)); }
-.hourly::after{ right: 0; background: linear-gradient(270deg, rgba(34,34,34,1), rgba(34,34,34,0)); }
+/* Removed edge gradient fades */
 
 /* Nav arrows */
-.hour-nav{ position: absolute; top: 28px; right: 0; display: flex; gap: 6px; }
+.hour-nav{ display: flex; gap: 6px; }
 .hour-nav button{ background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 8px; padding: 6px 8px; cursor: pointer; }
 .hour-nav button:hover{ background: rgba(255,255,255,0.22); }
 
@@ -279,22 +279,28 @@ body {
 /* Theme support */
 body.light { background: #f5f7fa; }
 body.light .card {
-    background: linear-gradient(135deg, #cfe9ff, #6aa9ff);
-    color: #051c2c;
+    background: linear-gradient(135deg, #d7ecff, #7bb4ff);
+    color: #0a2235;
 }
+body.light .app-header { color: #0a2235; }
+body.light .app-header .subtitle { color: #3a5366; }
 body.light .controls .geo-btn,
 body.light .controls .theme-toggle,
+.controls .units-toggle,
 body.light .metric,
 body.light .forecast-day{
-    background: rgba(255,255,255,0.9);
-    color: #051c2c;
-    border-color: rgba(5,28,44,0.15);
+    background: rgba(10,34,53,0.08);
+    color: #0a2235;
+    border-color: rgba(10,34,53,0.25);
 }
 body.light .error{
     background: rgba(255, 87, 87, 0.12);
     color: #8b0000;
     border-color: rgba(255, 87, 87, 0.4);
 }
+body.light .hour-nav button{ background: rgba(10,34,53,0.08); color: #0a2235; border-color: rgba(10,34,53,0.25); }
+body.light .fav-toggle{ background: rgba(10,34,53,0.08); color: #0a2235; border-color: rgba(10,34,53,0.25); }
+body.light .suggestions li:hover{ background: rgba(10,34,53,0.08); }
 
 
 

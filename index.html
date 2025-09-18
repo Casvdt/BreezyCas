@@ -15,30 +15,35 @@
 
     <header class="app-header">
         <h1>Breezy Cas</h1>
-        <p class="subtitle">Live weerbericht op plaatsnaam!</p>
+        <p class="subtitle translatable" data-en="Live weather by location!" data-nl="Live weerbericht op plaatsnaam!">Live weather by location!</p>
     </header>
+
+    <div class="lang-switch lang-switch-top">
+        <button class="lang-btn" type="button" data-lang="en">EN</button>
+        <button class="lang-btn" type="button" data-lang="nl">NL</button>
+    </div>
 
     <main>
 
         <div class="card">
             <img src="./IMG/WEERAPPLOGO.png" class="logoImg">
             <div class="search">
-                <input type="text" placeholder="Typ een plaatsnaam" spellcheck="false">
-                <button><img src="./IMG/search.png" alt="Zoeken"></button>
+                <input class="search-input" type="text" placeholder="Type a city" spellcheck="false" data-en="Type a city" data-nl="Typ een plaatsnaam">
+                <button class="translatable" data-en="<img src='./IMG/search.png' alt='Search'>" data-nl="<img src='./IMG/search.png' alt='Zoeken'>"><img src="./IMG/search.png" alt="Search"></button>
             </div>
             <ul class="suggestions" role="listbox" aria-label="Suggesties"></ul>
             <div class="controls">
-                <button class="geo-btn" type="button">Gebruik mijn locatie</button>
+                <button class="geo-btn translatable" type="button" data-en="Use my location" data-nl="Gebruik mijn locatie">Use my location</button>
                 <button class="units-toggle" type="button" aria-label="Eenheden wisselen">°C / °F</button>
                 <button class="theme-toggle" type="button" aria-label="Thema wisselen">🌗</button>
             </div>
             <div class="favorites">
-                <div class="fav-title">Favorieten</div>
+                <div class="fav-title translatable" data-en="Favorites" data-nl="Favorieten">Favorites</div>
                 <div class="fav-list"></div>
-                <button class="fav-toggle" type="button" aria-label="Voeg toe aan favorieten">☆ Bewaar</button>
+                <button class="fav-toggle translatable" type="button" aria-label="Voeg toe aan favorieten" data-en="☆ Save" data-nl="☆ Bewaar">☆ Save</button>
             </div>
             <div class="error">
-                <p>Ongeldige plaatsnaam</p>
+                <p class="translatable" data-en="Invalid city name" data-nl="Ongeldige plaatsnaam">Invalid city name</p>
             </div>
             <div class="loading" aria-hidden="true">
                 <div class="spinner" role="status" aria-label="Laden"></div>
@@ -46,58 +51,58 @@
             <div class="weather">
                 <img src="./IMG/rain.png" class="weather-icon" alt="Weericoon">
                 <h1 class="temp">-1°C</h1>
-                <h2 class="city">Wateringen</h2>
-                <p class="desc">Licht bewolkt</p>
+                <h2 class="city">—</h2>
+                <p class="desc">—</p>
                 <div class="details">
                     <div class="metric">
                         <img src="./IMG/humidity.png" alt="Luchtvochtigheid">
                         <div class="metric-text">
                             <p class="humidity value">50%</p>
-                            <p class="label">Luchtvochtigheid</p>
+                            <p class="label translatable" data-en="Humidity" data-nl="Luchtvochtigheid">Humidity</p>
                         </div>
                     </div>
                     <div class="metric">
                         <img src="./IMG/wind.png" alt="Windsnelheid">
                         <div class="metric-text">
-                            <p class="wind value">15 km/u</p>
-                            <p class="label">Windsnelheid • <span class="winddir">-</span></p>
+                            <p class="wind value">—</p>
+                            <p class="label translatable" data-en="Wind speed • <span class='winddir'>-</span>" data-nl="Windsnelheid • <span class='winddir'>-</span>">Wind speed • <span class='winddir'>-</span></p>
                         </div>
                     </div>
                     <div class="metric">
                         <img src="./IMG/clear.png" alt="Gevoelstemperatuur">
                         <div class="metric-text">
                             <p class="feels value">-</p>
-                            <p class="label">Gevoelstemperatuur</p>
+                            <p class="label translatable" data-en="Feels like" data-nl="Gevoelstemperatuur">Feels like</p>
                         </div>
                     </div>
                     <div class="metric">
                         <img src="./IMG/rain.png" alt="Neerslagkans">
                         <div class="metric-text">
                             <p class="precip value">-</p>
-                            <p class="label">Neerslagkans</p>
+                            <p class="label translatable" data-en="Precipitation" data-nl="Neerslagkans">Precipitation</p>
                         </div>
                     </div>
                     <div class="metric">
                         <img src="./IMG/mist.png" alt="Zicht">
                         <div class="metric-text">
                             <p class="visibility value">-</p>
-                            <p class="label">Zicht</p>
+                            <p class="label translatable" data-en="Visibility" data-nl="Zicht">Visibility</p>
                         </div>
                     </div>
                     <div class="metric">
                         <img src="./IMG/drizzle.png" alt="Luchtdruk">
                         <div class="metric-text">
                             <p class="pressure value">-</p>
-                            <p class="label">Luchtdruk</p>
+                            <p class="label translatable" data-en="Pressure" data-nl="Luchtdruk">Pressure</p>
                         </div>
                     </div>
                 </div>
                 <div class="astro">
-                    <div class="pill sunrise">Zonsopkomst: <span class="sunrise-time">-</span></div>
-                    <div class="pill sunset">Zonsondergang: <span class="sunset-time">-</span></div>
+                    <div class="pill sunrise translatable" data-en="Sunrise: <span class='sunrise-time'>-</span>" data-nl="Zonsopkomst: <span class='sunrise-time'>-</span>">Sunrise: <span class='sunrise-time'>-</span></div>
+                    <div class="pill sunset translatable" data-en="Sunset: <span class='sunset-time'>-</span>" data-nl="Zonsondergang: <span class='sunset-time'>-</span>">Sunset: <span class='sunset-time'>-</span></div>
                 </div>
                 <div class="forecast">
-                    <h3>Verwachting (5 dagen)</h3>
+                    <h3 class="translatable" data-en="5-day forecast" data-nl="Verwachting (5 dagen)">5-day forecast</h3>
                     <div class="forecast-grid">
                         <div class="forecast-day">
                             <div class="day-name">Ma</div>
@@ -118,23 +123,22 @@
                             <div class="day-name">Do</div>
                             <img src="./IMG/drizzle.png" alt="">
                             <div class="day-temps">11° / 6°</div>
-                        </div>
+                    </div>
                         <div class="forecast-day">
                             <div class="day-name">Vr</div>
                             <img src="./IMG/mist.png" alt="">
                             <div class="day-temps">8° / 4°</div>
-                        </div>
                     </div>
                 </div>
+                </div>
                 <div class="hourly">
-                    <h3>Uurlijkse verwachting</h3>
+                    <h3 class="translatable" data-en="Hourly forecast" data-nl="Uurlijkse verwachting">Hourly forecast</h3>
                     <div class="hour-nav">
                         <button class="hour-left" type="button">←</button>
                         <button class="hour-right" type="button">→</button>
                     </div>
-                    <div class="hourly-scroll"></div>
                 </div>
-                <div class="last-updated">Laatst bijgewerkt: <span class="updated-at">-</span></div>
+                <div class="last-updated translatable" data-en="Last updated: <span class='updated-at'>-</span>" data-nl="Laatst bijgewerkt: <span class='updated-at'>-</span>">Last updated: <span class='updated-at'>-</span></div>
             </div>
         </div>
     </main>

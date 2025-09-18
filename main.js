@@ -573,6 +573,42 @@ async function fetchSuggestions(q){
         return await res.json();
     } catch { return []; }
 }
+
+// ===== Language switcher =====
+const langBtns = document.querySelectorAll('.lang-btn');
+const translatableElems = document.querySelectorAll('.translatable');
+
+function applyLanguage(lang) {
+    translatableElems.forEach(el => {
+        const value = el.dataset[lang];
+        if (value) {
+            // For inputs, update placeholder; for others, innerHTML
+            if (el.tagName === 'INPUT') {
+                el.setAttribute('placeholder', value);
+            } else {
+                el.innerHTML = value;
+            }
+        }
+    });
+    langBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.lang === lang));
+    try { localStorage.setItem('preferred_lang', lang); } catch {}
+    try { document.documentElement.setAttribute('lang', lang); } catch {}
+}
+
+if (langBtns.length) {
+    langBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const lang = btn.dataset.lang; // 'nl' or 'en'
+            applyLanguage(lang);
+        });
+    });
+    let initialLang = 'en';
+    try {
+        const stored = localStorage.getItem('preferred_lang');
+        if (stored === 'nl' || stored === 'en') initialLang = stored;
+    } catch {}
+    applyLanguage(initialLang);
+}
 if (suggestionsEl && searchBox) {
     let debounce;
     searchBox.addEventListener('input', () => {
