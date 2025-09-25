@@ -48,6 +48,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
 }
 
 .controls{
@@ -106,8 +107,8 @@ body.light .lang-btn.active{ box-shadow: 0 0 0 2px rgba(10,34,53,0.35) inset; }
     padding: 10px 25px;
     height: 60px;
     border-radius: 30px;
-    flex: 1;
-    margin-right: 16px;
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 18px;
 }
 
@@ -348,6 +349,9 @@ body.light .site-footer a{ color: #0a2235; }
     .controls{ flex-wrap: wrap; gap: 8px; }
     .forecast-grid{ grid-template-columns: repeat(3, 1fr); }
     .hourly-list{ grid-template-columns: repeat(3, 1fr); }
+    .search{ gap: 10px; }
+    .search input{ margin-right: 0; }
+    .search button{ flex: 0 0 52px; }
     .weather h1{ font-size: 56px; }
     .weather h2{ font-size: 32px; }
     .weather-icon{ width: 120px; }
@@ -359,8 +363,9 @@ body.light .site-footer a{ color: #0a2235; }
     .app-header{ margin-top: 24px; }
     .app-header h1{ font-size: 26px; }
     .card{ border-radius: 16px; padding: 22px 18px; }
-    .search input{ height: 52px; font-size: 16px; padding: 8px 16px; }
-    .search button{ width: 52px; height: 52px; }
+    .search{ gap: 8px; }
+    .search input{ height: 52px; font-size: 16px; padding: 8px 16px; margin-right: 0; width: 100%; flex: 1 1 auto; min-width: 0; }
+    .search button{ width: 48px; height: 48px; flex: 0 0 48px; }
     .controls .geo-btn, .controls .units-toggle, .controls .theme-toggle{ padding: 8px 12px; }
     .details{ grid-template-columns: 1fr; }
     .forecast-grid{ grid-template-columns: repeat(2, 1fr); gap: 8px; }
