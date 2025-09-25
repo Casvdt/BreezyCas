@@ -306,7 +306,7 @@ if (geoBtn && navigator.geolocation) {
             }
         }, () => {
             // If denied, do nothing
-        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+        });
     });
 }
 
@@ -431,74 +431,16 @@ function haversineKm(lat1, lon1, lat2, lon2){
 
 async function reverseGeocode(lat, lon) {
     try {
-        // 1) Try OpenStreetMap Nominatim for most specific village-level name first
-        try {
-            const nomi = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=18&addressdetails=1&accept-language=nl`);
-            if (nomi.ok) {
-                const nd = await nomi.json();
-                const a = nd && nd.address ? nd.address : {};
-                const priority = ['hamlet','village','town','locality','neighbourhood','suburb'];
-                for (const key of priority) { if (a[key]) return a[key]; }
-                if (a.municipality) return a.municipality;
-                if (a.city_district) return a.city_district;
-                if (a.city) return a.city;
-            }
-        } catch {}
-        // 1b) Try Overpass API to find nearest place=village|hamlet|town within 8km
-        try {
-            const overpassQuery = `[out:json][timeout:10];(node(around:8000,${lat},${lon})[place~"^(hamlet|village|town)$"];way(around:8000,${lat},${lon})[place~"^(hamlet|village|town)$"];relation(around:8000,${lat},${lon})[place~"^(hamlet|village|town)$"];);out center;`;
-            const overpassRes = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(overpassQuery)}` });
-            if (overpassRes.ok) {
-                const od = await overpassRes.json();
-                if (od && Array.isArray(od.elements) && od.elements.length) {
-                    let best = null; let bestDist = Infinity;
-                    for (const el of od.elements) {
-                        const elLat = el.lat || (el.center && el.center.lat);
-                        const elLon = el.lon || (el.center && el.center.lon);
-                        if (typeof elLat !== 'number' || typeof elLon !== 'number') continue;
-                        const d = haversineKm(lat, lon, elLat, elLon);
-                        if (d < bestDist) { bestDist = d; best = el; }
-                    }
-                    if (best && best.tags) {
-                        const name = best.tags['name:nl'] || best.tags['name'];
-                        if (name) return name;
-                    }
-                }
-            }
-        } catch {}
-        // 2) Fallback to OpenWeather reverse geocoding with expanded results and adjusted ranking
-        const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=50&appid=${APIKey}`);
+        const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=5&appid=${APIKey}`);
         if (!res.ok) return null;
         const data = await res.json();
         if (Array.isArray(data) && data.length) {
-            // First, hard-prefer true settlements near you
-            const settlementTypes = new Set(['village','hamlet','town']);
-            const settlements = data.filter(p => settlementTypes.has(p?.type));
-            const pickNearest = (list) => {
-                let best = null; let bestDist = Infinity;
-                for (const p of list) {
-                    const d = (typeof p.lat === 'number' && typeof p.lon === 'number') ? haversineKm(lat, lon, p.lat, p.lon) : 1000;
-                    if (d < bestDist) { bestDist = d; best = p; }
-                }
-                return best;
-            };
-            if (settlements.length) {
-                const bestSettle = pickNearest(settlements);
-                const localName = bestSettle && bestSettle.local_names && bestSettle.local_names.nl ? bestSettle.local_names.nl : (bestSettle ? bestSettle.name : null);
-                if (localName) return localName;
-            }
-            // Else, fallback to ranked scoring that de-prioritizes city districts
-            const typeRank = { hamlet:0, village:0, town:1, locality:2, neighbourhood:4, suburb:5, city_district:9, municipality:10, city:11, county:12, state:13 };
-            let best = null;
-            let bestScore = Infinity;
-            for (const p of data) {
-                const rank = typeRank[p?.type] ?? 14;
-                const dist = (typeof p.lat === 'number' && typeof p.lon === 'number') ? haversineKm(lat, lon, p.lat, p.lon) : 1000;
-                const score = rank + Math.min(dist, 100) / 20;
-                if (score < bestScore) { bestScore = score; best = p; }
-            }
-            const localName = best && best.local_names && best.local_names.nl ? best.local_names.nl : (best ? best.name : null);
-            return localName || (best ? best.name : null) || null;
+            // Prefer broader city/town first like earlier behavior
+            const preferOrder = [ 'city', 'town', 'village', 'municipality', 'state', 'county' ];
+            let chosen = data.find(p => preferOrder.includes(p?.type));
+            if (!chosen) chosen = data[0];
+            const localName = chosen.local_names && chosen.local_names.nl ? chosen.local_names.nl : chosen.name;
+            return localName || chosen.name || null;
         }
         return null;
     } catch {
