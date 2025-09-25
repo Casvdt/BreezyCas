@@ -448,41 +448,32 @@ function haversineKm(lat1, lon1, lat2, lon2){
 
 async function reverseGeocode(lat, lon) {
     try {
-        // 1) Try OpenStreetMap Nominatim for most specific local name (village/hamlet/suburb/neighbourhood)
+        // 1) Try OpenStreetMap Nominatim for most specific village-level name first
         try {
-            const nomi = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=15&addressdetails=1&accept-language=nl`);
+            const nomi = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=18&addressdetails=1&accept-language=nl`);
             if (nomi.ok) {
                 const nd = await nomi.json();
                 const a = nd && nd.address ? nd.address : {};
-                const specific = a.hamlet || a.village || a.suburb || a.neighbourhood || a.town || a.locality || a.city_district || a.municipality || a.city;
-                if (specific) return specific;
+                const priority = ['hamlet','village','town','locality','neighbourhood','suburb'];
+                for (const key of priority) { if (a[key]) return a[key]; }
+                if (a.municipality) return a.municipality;
+                if (a.city_district) return a.city_district;
+                if (a.city) return a.city;
             }
         } catch {}
-        // 2) Fallback to OpenWeather reverse geocoding with nearest small locality preference
-        const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=10&appid=${APIKey}`);
+        // 2) Fallback to OpenWeather reverse geocoding with expanded results and adjusted ranking
+        const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=50&appid=${APIKey}`);
         if (!res.ok) return null;
         const data = await res.json();
         if (Array.isArray(data) && data.length) {
             // Rank smaller localities higher; tie-breaker by distance
-            const typeRank = {
-                neighbourhood: 0,
-                suburb: 1,
-                hamlet: 2,
-                village: 3,
-                town: 4,
-                locality: 5,
-                city_district: 6,
-                municipality: 7,
-                city: 8,
-                county: 9,
-                state: 10
-            };
+            const typeRank = { hamlet:0, village:0, town:1, locality:2, neighbourhood:3, suburb:4, city_district:8, municipality:9, city:10, county:11, state:12 };
             let best = null;
             let bestScore = Infinity;
             for (const p of data) {
-                const rank = typeRank[p?.type] ?? 11;
+                const rank = typeRank[p?.type] ?? 13;
                 const dist = (typeof p.lat === 'number' && typeof p.lon === 'number') ? haversineKm(lat, lon, p.lat, p.lon) : 1000;
-                const score = rank + Math.min(dist, 100) / 50; // stronger distance factor
+                const score = rank + Math.min(dist, 100) / 25; // stronger distance influence
                 if (score < bestScore) { bestScore = score; best = p; }
             }
             const localName = best && best.local_names && best.local_names.nl ? best.local_names.nl : (best ? best.name : null);
