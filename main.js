@@ -466,14 +466,30 @@ async function reverseGeocode(lat, lon) {
         if (!res.ok) return null;
         const data = await res.json();
         if (Array.isArray(data) && data.length) {
-            // Rank smaller localities higher; tie-breaker by distance
-            const typeRank = { hamlet:0, village:0, town:1, locality:2, neighbourhood:3, suburb:4, city_district:8, municipality:9, city:10, county:11, state:12 };
+            // First, hard-prefer true settlements near you
+            const settlementTypes = new Set(['village','hamlet','town']);
+            const settlements = data.filter(p => settlementTypes.has(p?.type));
+            const pickNearest = (list) => {
+                let best = null; let bestDist = Infinity;
+                for (const p of list) {
+                    const d = (typeof p.lat === 'number' && typeof p.lon === 'number') ? haversineKm(lat, lon, p.lat, p.lon) : 1000;
+                    if (d < bestDist) { bestDist = d; best = p; }
+                }
+                return best;
+            };
+            if (settlements.length) {
+                const bestSettle = pickNearest(settlements);
+                const localName = bestSettle && bestSettle.local_names && bestSettle.local_names.nl ? bestSettle.local_names.nl : (bestSettle ? bestSettle.name : null);
+                if (localName) return localName;
+            }
+            // Else, fallback to ranked scoring that de-prioritizes city districts
+            const typeRank = { hamlet:0, village:0, town:1, locality:2, neighbourhood:4, suburb:5, city_district:9, municipality:10, city:11, county:12, state:13 };
             let best = null;
             let bestScore = Infinity;
             for (const p of data) {
-                const rank = typeRank[p?.type] ?? 13;
+                const rank = typeRank[p?.type] ?? 14;
                 const dist = (typeof p.lat === 'number' && typeof p.lon === 'number') ? haversineKm(lat, lon, p.lat, p.lon) : 1000;
-                const score = rank + Math.min(dist, 100) / 25; // stronger distance influence
+                const score = rank + Math.min(dist, 100) / 20;
                 if (score < bestScore) { bestScore = score; best = p; }
             }
             const localName = best && best.local_names && best.local_names.nl ? best.local_names.nl : (best ? best.name : null);
