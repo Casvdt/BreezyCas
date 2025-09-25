@@ -485,9 +485,16 @@ async function reverseGeocode(lat, lon) {
 
 function renderHourlyFromForecast(list, count){
     if (!hourlyList) return;
-    const nowTs = Date.now();
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const d0 = now.getDate();
+    const nowTs = now.getTime();
     const limit = typeof count === 'number' ? count : 8;
-    const upcoming = list.filter(item => (item.dt * 1000) >= nowTs).slice(0, limit);
+    const upcoming = list.filter(item => {
+        const d = new Date(item.dt * 1000);
+        return d.getFullYear() === y && d.getMonth() === m && d.getDate() === d0 && d.getTime() >= nowTs;
+    }).slice(0, limit);
     hourlyList.innerHTML = '';
     upcoming.forEach((h, idx) => {
         const d = new Date(h.dt * 1000);
