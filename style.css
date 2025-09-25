@@ -270,18 +270,6 @@ body.light .lang-btn.active{ box-shadow: 0 0 0 2px rgba(10,34,53,0.35) inset; }
 .hour-nav{ display: flex; gap: 6px; }
 .hour-nav button{ background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 8px; padding: 6px 8px; cursor: pointer; }
 .hour-nav button:hover{ background: rgba(255,255,255,0.22); }
-.hourly-view{ display: grid; grid-template-columns: repeat(5, auto); gap: 12px; align-items: center; margin-top: 10px; font-size: 14px; }
-.hourly-view .hv-temp{ font-weight: 600; }
-.hourly-view .hv-icon{ width: 28px; height: 28px; }
-body.light .hour-nav button{ background: rgba(10,34,53,0.08); color: #0a2235; border-color: rgba(10,34,53,0.25); }
-
-.hourly-list{ display: grid; grid-template-columns: repeat(8, minmax(70px,1fr)); gap: 10px; margin-top: 12px; }
-.hourly-item{ background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 8px; text-align: center; }
-.hourly-item .t{ font-size: 12px; opacity: 0.9; }
-.hourly-item img{ width: 28px; height: 28px; }
-.hourly-item .v{ font-size: 13px; margin-top: 4px; }
-.hourly-item .p{ font-size: 11px; opacity: 0.85; margin-top: 2px; }
-body.light .hourly-item{ background: rgba(10,34,53,0.08); border-color: rgba(10,34,53,0.25); }
 
 .last-updated{ margin-top: 12px; font-size: 12px; opacity: 0.85; }
 

@@ -25,10 +25,6 @@ const favToggleEl = document.querySelector(".fav-toggle")
 const hourlyScrollEl = document.querySelector(".hourly-scroll")
 const hourLeftBtn = document.querySelector(".hour-left")
 const hourRightBtn = document.querySelector(".hour-right")
-const hourlyView = document.querySelector('.hourly-view')
-const hourlyList = document.querySelector('.hourly-list')
-let hourlyData = [];
-let hourlyIndex = 0;
 
 // Units state
 let currentUnits = localStorage.getItem('units') || 'metric'; // 'metric' | 'imperial'
@@ -240,15 +236,26 @@ async function renderForecastByCity(city) {
             forecastGridEl.appendChild(el);
         }
 
-        // Hourly data for today only (3-hour steps)
-        hourlyData = data.list.filter(item => {
-            const d = new Date(item.dt * 1000);
-            const now = new Date();
-            return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        }).slice(0, 8);
-        hourlyIndex = 0;
-        updateHourlyView();
-        renderHourlyList();
+        // Hourly section (next ~12 entries)
+        if (hourlyScrollEl) {
+            hourlyScrollEl.innerHTML = "";
+            const hours = data.list.slice(0, 12);
+            for (const h of hours) {
+                const d = new Date(h.dt * 1000);
+                const time = d.toLocaleTimeString("nl-NL", { hour: '2-digit', minute: '2-digit' });
+                const main = h.weather && h.weather[0] ? h.weather[0].main : "Clear";
+                const iconSrc = getIconForMain(main);
+                const card = document.createElement('div');
+                card.className = 'hour-card';
+                card.innerHTML = `
+                    <div class="t">${time}</div>
+                    <img src="${iconSrc}" alt="${main}">
+                    <div class="v">${formatTemp(h.main.temp)}</div>
+                    <div class="p">${typeof h.pop==='number' ? Math.round(h.pop*100)+"%" : ''}</div>
+                `;
+                hourlyScrollEl.appendChild(card);
+            }
+        }
     } catch (e) {
         console.error(e);
     }
@@ -382,15 +389,25 @@ async function renderForecastByCoords(lat, lon) {
             forecastGridEl.appendChild(el);
         }
 
-        // Hourly data for today only
-        hourlyData = data.list.filter(item => {
-            const d = new Date(item.dt * 1000);
-            const now = new Date();
-            return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        }).slice(0, 8);
-        hourlyIndex = 0;
-        updateHourlyView();
-        renderHourlyList();
+        // Hourly
+        if (hourlyScrollEl) {
+            hourlyScrollEl.innerHTML = "";
+            const hours = data.list.slice(0, 12);
+            for (const h of hours) {
+                const d = new Date(h.dt * 1000);
+                const time = d.toLocaleTimeString("nl-NL", { hour: '2-digit', minute: '2-digit' });
+                const main = h.weather && h.weather[0] ? h.weather[0].main : "Clear";
+                const iconSrc = getIconForMain(main);
+                const card = document.createElement('div');
+                card.className = 'hour-card';
+                card.innerHTML = `
+                    <div class=\"t\">${time}</div>
+                    <img src=\"${iconSrc}\" alt=\"${main}\">
+                    <div class=\"v\">${formatTemp(h.main.temp)}</div>
+                `;
+                hourlyScrollEl.appendChild(card);
+            }
+        }
     } catch (e) {
         console.error(e);
     }
@@ -568,30 +585,11 @@ function applyLanguage(lang) {
     translatableElems.forEach(el => {
         const value = el.dataset[lang];
         if (value) {
-            // Preserve dynamic values inside known spans before swapping language markup
-            const preserved = {
-                sunrise: el.querySelector('.sunrise-time') ? el.querySelector('.sunrise-time').textContent : null,
-                sunset: el.querySelector('.sunset-time') ? el.querySelector('.sunset-time').textContent : null,
-                updated: el.querySelector('.updated-at') ? el.querySelector('.updated-at').textContent : null,
-            };
             // For inputs, update placeholder; for others, innerHTML
             if (el.tagName === 'INPUT') {
                 el.setAttribute('placeholder', value);
             } else {
                 el.innerHTML = value;
-                // Restore preserved dynamic values if present
-                if (preserved.sunrise) {
-                    const s = el.querySelector('.sunrise-time');
-                    if (s) s.textContent = preserved.sunrise;
-                }
-                if (preserved.sunset) {
-                    const s2 = el.querySelector('.sunset-time');
-                    if (s2) s2.textContent = preserved.sunset;
-                }
-                if (preserved.updated) {
-                    const u = el.querySelector('.updated-at');
-                    if (u) u.textContent = preserved.updated;
-                }
             }
         }
     });
@@ -639,94 +637,11 @@ if (suggestionsEl && searchBox) {
 }
 
 // Hourly nav scrolling
-// Arrows navigate hourly items by selecting previous/next item
 function scrollHourly(direction){
-    if (!hourlyList || !hourlyList.children.length) return;
-    const items = Array.from(hourlyList.children);
-    let selected = items.findIndex(el => el.classList.contains('selected'));
-    if (selected === -1) selected = 0;
-    selected = (selected + direction + items.length) % items.length;
-    items.forEach((el, i) => el.classList.toggle('selected', i === selected));
-    // update main weather icon/temp to match selected hour
-    const h = hourlyData[selected];
-    if (h) {
-        const icon = getIconForMain(h.weather && h.weather[0] ? h.weather[0].main : 'Clear');
-        const desc = h.weather && h.weather[0] ? h.weather[0].description : '';
-        if (weatherIcon) weatherIcon.src = icon;
-        const tempEl = document.querySelector('.temp');
-        if (tempEl) tempEl.textContent = formatTemp(h.main.temp);
-        const descEl = document.querySelector('.desc');
-        if (descEl && desc) descEl.textContent = desc.charAt(0).toUpperCase() + desc.slice(1);
-    }
-    items[selected].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    if (!hourlyScrollEl) return;
+    const cardWidth = hourlyScrollEl.firstElementChild ? hourlyScrollEl.firstElementChild.getBoundingClientRect().width + 12 : 120;
+    hourlyScrollEl.scrollBy({ left: direction * cardWidth * 2, behavior: 'smooth' });
 }
 if (hourLeftBtn) hourLeftBtn.addEventListener('click', () => scrollHourly(-1));
 if (hourRightBtn) hourRightBtn.addEventListener('click', () => scrollHourly(1));
-
-function updateHourlyView(){
-    if (!hourlyView || !hourlyData.length) return;
-    const h = hourlyData[hourlyIndex];
-    const d = new Date(h.dt * 1000);
-    const time = d.toLocaleTimeString("nl-NL", { hour: '2-digit', minute: '2-digit' });
-    const main = h.weather && h.weather[0] ? h.weather[0].main : "Clear";
-    const iconSrc = getIconForMain(main);
-    const hvTime = hourlyView.querySelector('.hv-time');
-    const hvIcon = hourlyView.querySelector('.hv-icon');
-    const hvTemp = hourlyView.querySelector('.hv-temp');
-    const hvPop = hourlyView.querySelector('.hv-pop');
-    const hvWind = hourlyView.querySelector('.hv-wind');
-    if (hvTime) hvTime.textContent = time;
-    if (hvIcon) hvIcon.src = iconSrc;
-    if (hvTemp) hvTemp.textContent = formatTemp(h.main.temp);
-    if (hvPop) hvPop.textContent = (typeof h.pop==='number'? Math.round(h.pop*100)+"%" : '');
-    if (hvWind) hvWind.textContent = formatWind(h.wind && typeof h.wind.speed==='number'? h.wind.speed : 0);
-}
-
-// Hook arrows to change hourly index
-if (hourLeftBtn) hourLeftBtn.addEventListener('click', () => {
-    if (!hourlyData.length) return;
-    hourlyIndex = (hourlyIndex - 1 + hourlyData.length) % hourlyData.length;
-    updateHourlyView();
-});
-if (hourRightBtn) hourRightBtn.addEventListener('click', () => {
-    if (!hourlyData.length) return;
-    hourlyIndex = (hourlyIndex + 1) % hourlyData.length;
-    updateHourlyView();
-});
-
-function renderHourlyList(){
-    if (!hourlyList) return;
-    hourlyList.innerHTML = '';
-    if (!hourlyData.length) return;
-    hourlyData.forEach((h, idx) => {
-        const d = new Date(h.dt * 1000);
-        const time = d.toLocaleTimeString("nl-NL", { hour: '2-digit', minute: '2-digit' });
-        const main = h.weather && h.weather[0] ? h.weather[0].main : "Clear";
-        const iconSrc = getIconForMain(main);
-        const el = document.createElement('div');
-        el.className = 'hourly-item';
-        el.innerHTML = `
-            <div class="t">${time}</div>
-            <img src="${iconSrc}" alt="${main}">
-            <div class="v">${formatTemp(h.main.temp)}</div>
-            <div class="p">${typeof h.pop==='number' ? Math.round(h.pop*100)+"%" : ''}</div>
-        `;
-        el.addEventListener('click', () => {
-            const items = Array.from(hourlyList.children);
-            items.forEach(i => i.classList.remove('selected'));
-            el.classList.add('selected');
-            hourlyIndex = idx;
-            // update main display
-            const desc = h.weather && h.weather[0] ? h.weather[0].description : '';
-            if (weatherIcon) weatherIcon.src = iconSrc;
-            const tempEl = document.querySelector('.temp');
-            if (tempEl) tempEl.textContent = formatTemp(h.main.temp);
-            const descEl = document.querySelector('.desc');
-            if (descEl && desc) descEl.textContent = desc.charAt(0).toUpperCase() + desc.slice(1);
-        });
-        hourlyList.appendChild(el);
-    });
-    // mark first as selected by default
-    if (hourlyList.firstElementChild) hourlyList.firstElementChild.classList.add('selected');
-}
 
