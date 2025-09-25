@@ -236,8 +236,8 @@ async function renderForecastByCity(city) {
             forecastGridEl.appendChild(el);
         }
 
-        // Hourly: next 8 upcoming entries from now (can span midnight)
-        renderHourlyFromForecast(data.list);
+        // Hourly: next 10 upcoming entries from now (can span midnight)
+        renderHourlyFromForecast(data.list, 10);
     } catch (e) {
         console.error(e);
     }
@@ -371,8 +371,8 @@ async function renderForecastByCoords(lat, lon) {
             forecastGridEl.appendChild(el);
         }
 
-        // Hourly: next 8 upcoming entries
-        renderHourlyFromForecast(data.list);
+        // Hourly: next 10 upcoming entries
+        renderHourlyFromForecast(data.list, 10);
     } catch (e) {
         console.error(e);
     }
@@ -483,10 +483,11 @@ async function reverseGeocode(lat, lon) {
     }
 }
 
-function renderHourlyFromForecast(list){
+function renderHourlyFromForecast(list, count){
     if (!hourlyList) return;
     const nowTs = Date.now();
-    const upcoming = list.filter(item => (item.dt * 1000) >= nowTs).slice(0, 8);
+    const limit = typeof count === 'number' ? count : 8;
+    const upcoming = list.filter(item => (item.dt * 1000) >= nowTs).slice(0, limit);
     hourlyList.innerHTML = '';
     upcoming.forEach((h, idx) => {
         const d = new Date(h.dt * 1000);

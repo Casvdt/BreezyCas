@@ -258,11 +258,12 @@ body.light .lang-btn.active{ box-shadow: 0 0 0 2px rgba(10,34,53,0.35) inset; }
 .hourly{ margin-top: 20px; text-align: left; }
 .hourly h3{ font-size: 16px; font-weight: 600; margin-bottom: 10px; }
 .hourly-scroll{ display: none; }
-.hour-card{ display: none; }
-.hour-card .t{ font-size: 12px; opacity: 0.9; }
-.hour-card img{ width: 32px; height: 32px; }
-.hour-card .v{ font-size: 13px; margin-top: 4px; }
-.hour-card .p{ font-size: 11px; opacity: 0.85; margin-top: 2px; }
+.hourly-list{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 12px; }
+.hourly-item{ background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 10px 8px; text-align: center; }
+.hourly-item .t{ font-size: 12px; opacity: 0.9; margin-bottom: 6px; }
+.hourly-item img{ width: 36px; height: 36px; }
+.hourly-item .v{ font-size: 13px; margin-top: 6px; }
+.hourly-item .p{ font-size: 11px; opacity: 0.85; margin-top: 2px; }
 
 /* Removed edge gradient fades */
 
