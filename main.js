@@ -322,7 +322,7 @@ if (geoBtn && navigator.geolocation) {
             }
         }, () => {
             // If denied, do nothing
-        });
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     });
 }
 
@@ -448,6 +448,17 @@ function haversineKm(lat1, lon1, lat2, lon2){
 
 async function reverseGeocode(lat, lon) {
     try {
+        // 1) Try OpenStreetMap Nominatim for most specific local name (village/hamlet/suburb/neighbourhood)
+        try {
+            const nomi = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=15&addressdetails=1&accept-language=nl`);
+            if (nomi.ok) {
+                const nd = await nomi.json();
+                const a = nd && nd.address ? nd.address : {};
+                const specific = a.hamlet || a.village || a.suburb || a.neighbourhood || a.town || a.locality || a.city_district || a.municipality || a.city;
+                if (specific) return specific;
+            }
+        } catch {}
+        // 2) Fallback to OpenWeather reverse geocoding with nearest small locality preference
         const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=10&appid=${APIKey}`);
         if (!res.ok) return null;
         const data = await res.json();
@@ -471,7 +482,7 @@ async function reverseGeocode(lat, lon) {
             for (const p of data) {
                 const rank = typeRank[p?.type] ?? 11;
                 const dist = (typeof p.lat === 'number' && typeof p.lon === 'number') ? haversineKm(lat, lon, p.lat, p.lon) : 1000;
-                const score = rank + Math.min(dist, 50) / 100;
+                const score = rank + Math.min(dist, 100) / 50; // stronger distance factor
                 if (score < bestScore) { bestScore = score; best = p; }
             }
             const localName = best && best.local_names && best.local_names.nl ? best.local_names.nl : (best ? best.name : null);
