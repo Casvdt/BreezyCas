@@ -277,6 +277,17 @@ body.light .lang-btn.active{ box-shadow: 0 0 0 2px rgba(10,34,53,0.35) inset; }
 .astro{ display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
 .pill{ background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 6px 12px; font-size: 12px; }
 
+/* Footer */
+.site-footer{
+    max-width: 700px;
+    margin: 28px auto 24px;
+    text-align: center;
+    color: rgba(231,238,247,0.9);
+}
+.site-footer .subtle{ color: rgba(231,238,247,0.65); font-size: 12px; margin-top: 4px; }
+.site-footer a{ color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+.site-footer a:hover{ opacity: 0.85; }
+
 /* Theme support */
 body.light { background: #f5f7fa; }
 body.light .card {
@@ -302,6 +313,9 @@ body.light .error{
 body.light .hour-nav button{ background: rgba(10,34,53,0.08); color: #0a2235; border-color: rgba(10,34,53,0.25); }
 body.light .fav-toggle{ background: rgba(10,34,53,0.08); color: #0a2235; border-color: rgba(10,34,53,0.25); }
 body.light .suggestions li:hover{ background: rgba(10,34,53,0.08); }
+body.light .site-footer{ color: #3a5366; }
+body.light .site-footer .subtle{ color: rgba(10,34,53,0.7); }
+body.light .site-footer a{ color: #0a2235; }
 
 
 
@@ -320,4 +334,38 @@ body.light .suggestions li:hover{ background: rgba(10,34,53,0.08); }
     margin-bottom: 20px;
     height: auto;
     width: 70%;
+}
+
+/* Responsive layout */
+@media (max-width: 1024px) {
+    .forecast-grid{ grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 768px) {
+    .app-header h1{ font-size: 30px; }
+    .app-header .subtitle{ font-size: 13px; }
+    .card{ margin-top: 40px; padding: 28px 22px; }
+    .controls{ flex-wrap: wrap; gap: 8px; }
+    .forecast-grid{ grid-template-columns: repeat(3, 1fr); }
+    .hourly-list{ grid-template-columns: repeat(3, 1fr); }
+    .weather h1{ font-size: 56px; }
+    .weather h2{ font-size: 32px; }
+    .weather-icon{ width: 120px; }
+    .logoImg{ width: 80%; margin-right: 0; }
+}
+
+@media (max-width: 480px) {
+    body{ padding-bottom: 60px; }
+    .app-header{ margin-top: 24px; }
+    .app-header h1{ font-size: 26px; }
+    .card{ border-radius: 16px; padding: 22px 18px; }
+    .search input{ height: 52px; font-size: 16px; padding: 8px 16px; }
+    .search button{ width: 52px; height: 52px; }
+    .controls .geo-btn, .controls .units-toggle, .controls .theme-toggle{ padding: 8px 12px; }
+    .details{ grid-template-columns: 1fr; }
+    .forecast-grid{ grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .hourly-list{ grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .weather h1{ font-size: 44px; }
+    .weather h2{ font-size: 26px; }
+    .weather-icon{ width: 100px; }
 }
