@@ -22,7 +22,7 @@ const unitsToggle = document.querySelector(".units-toggle")
 const suggestionsEl = document.querySelector(".suggestions")
 const favListEl = document.querySelector(".fav-list")
 const favToggleEl = document.querySelector(".fav-toggle")
-const hourlyScrollEl = document.querySelector(".hourly-scroll")
+const hourlyList = document.querySelector('.hourly-list')
 const hourLeftBtn = document.querySelector(".hour-left")
 const hourRightBtn = document.querySelector(".hour-right")
 
@@ -236,26 +236,8 @@ async function renderForecastByCity(city) {
             forecastGridEl.appendChild(el);
         }
 
-        // Hourly section (next ~12 entries)
-        if (hourlyScrollEl) {
-            hourlyScrollEl.innerHTML = "";
-            const hours = data.list.slice(0, 12);
-            for (const h of hours) {
-                const d = new Date(h.dt * 1000);
-                const time = d.toLocaleTimeString("nl-NL", { hour: '2-digit', minute: '2-digit' });
-                const main = h.weather && h.weather[0] ? h.weather[0].main : "Clear";
-                const iconSrc = getIconForMain(main);
-                const card = document.createElement('div');
-                card.className = 'hour-card';
-                card.innerHTML = `
-                    <div class="t">${time}</div>
-                    <img src="${iconSrc}" alt="${main}">
-                    <div class="v">${formatTemp(h.main.temp)}</div>
-                    <div class="p">${typeof h.pop==='number' ? Math.round(h.pop*100)+"%" : ''}</div>
-                `;
-                hourlyScrollEl.appendChild(card);
-            }
-        }
+        // Hourly: next 8 upcoming entries from now (can span midnight)
+        renderHourlyFromForecast(data.list);
     } catch (e) {
         console.error(e);
     }
@@ -389,25 +371,8 @@ async function renderForecastByCoords(lat, lon) {
             forecastGridEl.appendChild(el);
         }
 
-        // Hourly
-        if (hourlyScrollEl) {
-            hourlyScrollEl.innerHTML = "";
-            const hours = data.list.slice(0, 12);
-            for (const h of hours) {
-                const d = new Date(h.dt * 1000);
-                const time = d.toLocaleTimeString("nl-NL", { hour: '2-digit', minute: '2-digit' });
-                const main = h.weather && h.weather[0] ? h.weather[0].main : "Clear";
-                const iconSrc = getIconForMain(main);
-                const card = document.createElement('div');
-                card.className = 'hour-card';
-                card.innerHTML = `
-                    <div class=\"t\">${time}</div>
-                    <img src=\"${iconSrc}\" alt=\"${main}\">
-                    <div class=\"v\">${formatTemp(h.main.temp)}</div>
-                `;
-                hourlyScrollEl.appendChild(card);
-            }
-        }
+        // Hourly: next 8 upcoming entries
+        renderHourlyFromForecast(data.list);
     } catch (e) {
         console.error(e);
     }
@@ -471,25 +436,84 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
+function haversineKm(lat1, lon1, lat2, lon2){
+    const toRad = (v) => v * Math.PI / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
 async function reverseGeocode(lat, lon) {
     try {
-        const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=5&appid=${APIKey}`);
+        const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=10&appid=${APIKey}`);
         if (!res.ok) return null;
         const data = await res.json();
         if (Array.isArray(data) && data.length) {
-            // Prefer city > town > village > municipality > state > county > name
-            const preferOrder = [
-                'city', 'town', 'village', 'municipality', 'state', 'county'
-            ];
-            let chosen = data.find(p => preferOrder.includes(p?.type));
-            if (!chosen) chosen = data[0];
-            const localName = chosen.local_names && chosen.local_names.nl ? chosen.local_names.nl : chosen.name;
-            return localName || chosen.name || null;
+            // Rank smaller localities higher; tie-breaker by distance
+            const typeRank = {
+                neighbourhood: 0,
+                suburb: 1,
+                hamlet: 2,
+                village: 3,
+                town: 4,
+                locality: 5,
+                city_district: 6,
+                municipality: 7,
+                city: 8,
+                county: 9,
+                state: 10
+            };
+            let best = null;
+            let bestScore = Infinity;
+            for (const p of data) {
+                const rank = typeRank[p?.type] ?? 11;
+                const dist = (typeof p.lat === 'number' && typeof p.lon === 'number') ? haversineKm(lat, lon, p.lat, p.lon) : 1000;
+                const score = rank + Math.min(dist, 50) / 100;
+                if (score < bestScore) { bestScore = score; best = p; }
+            }
+            const localName = best && best.local_names && best.local_names.nl ? best.local_names.nl : (best ? best.name : null);
+            return localName || (best ? best.name : null) || null;
         }
         return null;
     } catch {
         return null;
     }
+}
+
+function renderHourlyFromForecast(list){
+    if (!hourlyList) return;
+    const nowTs = Date.now();
+    const upcoming = list.filter(item => (item.dt * 1000) >= nowTs).slice(0, 8);
+    hourlyList.innerHTML = '';
+    upcoming.forEach((h, idx) => {
+        const d = new Date(h.dt * 1000);
+        const time = d.toLocaleTimeString("nl-NL", { hour: '2-digit', minute: '2-digit' });
+        const main = h.weather && h.weather[0] ? h.weather[0].main : "Clear";
+        const iconSrc = getIconForMain(main);
+        const el = document.createElement('div');
+        el.className = 'hourly-item';
+        el.innerHTML = `
+            <div class="t">${time}</div>
+            <img src="${iconSrc}" alt="${main}">
+            <div class="v">${formatTemp(h.main.temp)}</div>
+            <div class="p">${typeof h.pop==='number' ? Math.round(h.pop*100)+"%" : ''}</div>
+        `;
+        el.addEventListener('click', () => {
+            Array.from(hourlyList.children).forEach(i => i.classList.remove('selected'));
+            el.classList.add('selected');
+            const desc = h.weather && h.weather[0] ? h.weather[0].description : '';
+            if (weatherIcon) weatherIcon.src = iconSrc;
+            const tempEl = document.querySelector('.temp');
+            if (tempEl) tempEl.textContent = formatTemp(h.main.temp);
+            const descEl = document.querySelector('.desc');
+            if (descEl && desc) descEl.textContent = desc.charAt(0).toUpperCase() + desc.slice(1);
+        });
+        hourlyList.appendChild(el);
+        if (idx === 0) el.classList.add('selected');
+    });
 }
 
 // Theme toggle
@@ -638,9 +662,14 @@ if (suggestionsEl && searchBox) {
 
 // Hourly nav scrolling
 function scrollHourly(direction){
-    if (!hourlyScrollEl) return;
-    const cardWidth = hourlyScrollEl.firstElementChild ? hourlyScrollEl.firstElementChild.getBoundingClientRect().width + 12 : 120;
-    hourlyScrollEl.scrollBy({ left: direction * cardWidth * 2, behavior: 'smooth' });
+    if (!hourlyList || !hourlyList.children.length) return;
+    const items = Array.from(hourlyList.children);
+    let selected = items.findIndex(el => el.classList.contains('selected'));
+    if (selected === -1) selected = 0;
+    selected = (selected + direction + items.length) % items.length;
+    items.forEach((el, i) => el.classList.toggle('selected', i === selected));
+    items[selected].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    items[selected].click();
 }
 if (hourLeftBtn) hourLeftBtn.addEventListener('click', () => scrollHourly(-1));
 if (hourRightBtn) hourRightBtn.addEventListener('click', () => scrollHourly(1));
