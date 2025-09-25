@@ -444,6 +444,28 @@ async function reverseGeocode(lat, lon) {
                 if (a.city) return a.city;
             }
         } catch {}
+        // 1b) Try Overpass API to find nearest place=village|hamlet|town within 8km
+        try {
+            const overpassQuery = `[out:json][timeout:10];(node(around:8000,${lat},${lon})[place~"^(hamlet|village|town)$"];way(around:8000,${lat},${lon})[place~"^(hamlet|village|town)$"];relation(around:8000,${lat},${lon})[place~"^(hamlet|village|town)$"];);out center;`;
+            const overpassRes = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(overpassQuery)}` });
+            if (overpassRes.ok) {
+                const od = await overpassRes.json();
+                if (od && Array.isArray(od.elements) && od.elements.length) {
+                    let best = null; let bestDist = Infinity;
+                    for (const el of od.elements) {
+                        const elLat = el.lat || (el.center && el.center.lat);
+                        const elLon = el.lon || (el.center && el.center.lon);
+                        if (typeof elLat !== 'number' || typeof elLon !== 'number') continue;
+                        const d = haversineKm(lat, lon, elLat, elLon);
+                        if (d < bestDist) { bestDist = d; best = el; }
+                    }
+                    if (best && best.tags) {
+                        const name = best.tags['name:nl'] || best.tags['name'];
+                        if (name) return name;
+                    }
+                }
+            }
+        } catch {}
         // 2) Fallback to OpenWeather reverse geocoding with expanded results and adjusted ranking
         const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=50&appid=${APIKey}`);
         if (!res.ok) return null;
