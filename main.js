@@ -56,19 +56,7 @@ function updateAstro(sys, coord) {
     // UV requires One Call API; placeholder '-' unless we add that endpoint later
 }
 
-async function fetchAndUpdateUV(lat, lon) {
-    try {
-        const res = await fetch(`https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&units=metric&lang=nl&exclude=minutely,alerts&appid=${APIKey}`);
-        if (!res.ok) return; // silently skip if not allowed on this key
-        const data = await res.json();
-        const uvEl = document.querySelector('.uv-index');
-        if (!uvEl) return;
-        const uvi = (data.current && typeof data.current.uvi === 'number') ? data.current.uvi : (data.daily && data.daily[0] ? data.daily[0].uvi : null);
-        if (typeof uvi === 'number') {
-            uvEl.textContent = Math.round(uvi);
-        }
-    } catch { /* ignore */ }
-}
+// Removed UV index fetch (One Call API requires paid plan and triggers 401)
 
 // Auto refresh configuration
 const REFRESH_MS = 60000; // 60 seconds
@@ -168,11 +156,8 @@ async function checkWeather(city) {
         }
         const updatedAt = document.querySelector('.updated-at');
         if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-        // Astro and UV
+        // Astro
         updateAstro(data.sys, data.coord);
-        if (data.coord && typeof data.coord.lat === 'number' && typeof data.coord.lon === 'number') {
-            fetchAndUpdateUV(data.coord.lat, data.coord.lon);
-        }
         // Fetch and render 5-day forecast (also updates precip chance in details)
         renderForecastByCity(trimmedCity);
         // Remember last query and (re)start auto refresh
@@ -309,7 +294,6 @@ if (geoBtn && navigator.geolocation) {
                 const updatedAt = document.querySelector('.updated-at');
                 if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
                 updateAstro(data.sys, data.coord);
-                fetchAndUpdateUV(latitude, longitude);
                 renderForecastByCoords(latitude, longitude);
                 // Remember last coords and (re)start auto refresh
                 lastQuery = { type: 'coords', city: null, lat: latitude, lon: longitude };
@@ -417,7 +401,6 @@ async function updateByCoords(lat, lon) {
         const updatedAt = document.querySelector('.updated-at');
         if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
         await renderForecastByCoords(lat, lon);
-        fetchAndUpdateUV(lat, lon);
     } catch (e) {
         if (errorEl) errorEl.style.display = "block";
         console.error(e);
