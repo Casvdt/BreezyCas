@@ -7,15 +7,7 @@ import { API_KEY } from './config.js';
 
 const APIKey = API_KEY;
 
-// Centralized error display
-function showError(message) {
-    if (errorEl) {
-        const p = errorEl.querySelector('p');
-        if (p && message) p.textContent = message;
-        errorEl.style.display = "block";
-    }
-    if (weatherEl) weatherEl.style.display = "none";
-}
+ 
 
 const searchBox = document.querySelector(".search input")
 const searchBtn = document.querySelector(".search button")
@@ -121,13 +113,9 @@ async function checkWeather(city) {
 
         const response = await fetch(url + encodeURIComponent(trimmedCity) + `&appid=${APIKey}`);
 
-        if (response.status === 401) {
-            showError("API key missing or invalid. Add ?apikey=YOUR_KEY to the URL once.");
-            if (loadingEl) loadingEl.classList.remove("show");
-            return;
-        }
         if (response.status === 404) {
-            showError("Invalid city name");
+            if (errorEl) errorEl.style.display = "block";
+            if (weatherEl) weatherEl.style.display = "none";
             if (loadingEl) loadingEl.classList.remove("show");
             return;
         }
@@ -195,7 +183,8 @@ async function checkWeather(city) {
         lastQuery = { type: 'city', city: trimmedCity, lat: null, lon: null };
         startAutoRefresh();
     } catch (error) {
-        showError("Something went wrong. Please try again.");
+        if (errorEl) errorEl.style.display = "block";
+        if (weatherEl) weatherEl.style.display = "none";
         // Optionally log error to console for debugging
         console.error(error);
     }
@@ -560,10 +549,7 @@ const initialCity = params.get('city');
 if (initialCity) {
     checkWeather(initialCity);
 }
-// If API key not configured, show hint once at startup
-if (!APIKey || APIKey === 'YOUR_OPENWEATHERMAP_API_KEY') {
-    showError("Set your OpenWeather API key: add ?apikey=YOUR_KEY to the URL once.");
-}
+
 
 // Autocomplete suggestions using OW Geocoding
 async function fetchSuggestions(q){
