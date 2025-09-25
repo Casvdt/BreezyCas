@@ -40,6 +40,7 @@ body {
     padding: 40px 35px;
     text-align: center;
     box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    overflow: hidden;
 }
 
 
@@ -49,6 +50,7 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    max-width: 100%;
 }
 
 .controls{
@@ -124,6 +126,7 @@ body.light .lang-btn.active{ box-shadow: 0 0 0 2px rgba(10,34,53,0.35) inset; }
     align-items: center;
     justify-content: center;
     transition: transform 0.1s ease, box-shadow 0.2s ease;
+    flex-shrink: 0;
 }
 
 .search button img {
