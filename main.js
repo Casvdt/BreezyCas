@@ -62,6 +62,9 @@ function updateAstro(sys, coord) {
 const REFRESH_MS = 60000; // 60 seconds
 let refreshTimer = null;
 let lastQuery = { type: null, city: null, lat: null, lon: null };
+// Persist last system/coord for astro re-render on language switch
+let lastSys = null;
+let lastCoord = null;
 
 function stopAutoRefresh() {
     if (refreshTimer) {
@@ -157,7 +160,9 @@ async function checkWeather(city) {
         const updatedAt = document.querySelector('.updated-at');
         if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
         // Astro
-        updateAstro(data.sys, data.coord);
+        lastSys = data.sys || null;
+        lastCoord = data.coord || null;
+        updateAstro(lastSys, lastCoord);
         // Fetch and render 5-day forecast (also updates precip chance in details)
         renderForecastByCity(trimmedCity);
         // Remember last query and (re)start auto refresh
@@ -332,7 +337,9 @@ if (geoBtn && navigator.geolocation) {
             }
             const updatedAt = document.querySelector('.updated-at');
             if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-            updateAstro(data.sys, data.coord);
+            lastSys = data.sys || null;
+            lastCoord = data.coord || { lat: latitude, lon: longitude };
+            updateAstro(lastSys, lastCoord);
             renderForecastByCoords(latitude, longitude);
             // Remember last coords and (re)start auto refresh
             lastQuery = { type: 'coords', city: null, lat: latitude, lon: longitude };
@@ -436,6 +443,8 @@ async function updateByCoords(lat, lon) {
         }
         const updatedAt = document.querySelector('.updated-at');
         if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+        lastSys = data.sys || null;
+        lastCoord = data.coord || { lat, lon };
         await renderForecastByCoords(lat, lon);
     } catch (e) {
         if (errorEl) errorEl.style.display = "block";
@@ -629,6 +638,10 @@ function applyLanguage(lang) {
     langBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.lang === lang));
     try { localStorage.setItem('preferred_lang', lang); } catch {}
     try { document.documentElement.setAttribute('lang', lang); } catch {}
+    // Re-render dynamic astro texts after language replacement resets innerHTML
+    if (lastSys) {
+        updateAstro(lastSys, lastCoord);
+    }
 }
 
 if (langBtns.length) {
