@@ -289,61 +289,41 @@ async function getPrecisePosition({
 
 if (geoBtn && navigator.geolocation) {
     geoBtn.addEventListener("click", async () => {
+        if (errorEl) errorEl.style.display = "none";
+        // Quick first fix using cached/network location for speed
+        let quickPos = null;
         try {
-            if (loadingEl) loadingEl.classList.add("show");
-            if (errorEl) errorEl.style.display = "none";
-            if (weatherEl) weatherEl.style.display = "none";
+            quickPos = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 300000, timeout: 5000 });
+            });
+        } catch {}
 
-            // Attempt to get a precise position first, fallback to single reading
-            let pos;
-            try {
-                pos = await getPrecisePosition({ desiredAccuracy: 100, timeoutMs: 12000, maximumAge: 0 });
-            } catch (e) {
-                pos = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
-                });
+        // Start precise fix in background
+        const precisePromise = getPrecisePosition({ desiredAccuracy: 50, timeoutMs: 15000, maximumAge: 0 }).catch(() => null);
+
+        try {
+            if (quickPos) {
+                // Render quickly
+                await updateByCoords(quickPos.coords.latitude, quickPos.coords.longitude);
+                lastQuery = { type: 'coords', city: null, lat: quickPos.coords.latitude, lon: quickPos.coords.longitude };
+                startAutoRefresh();
+            } else {
+                if (loadingEl) loadingEl.classList.add("show");
             }
 
-            const { latitude, longitude } = pos.coords;
-            const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?units=metric&lang=nl&lat=${latitude}&lon=${longitude}&appid=${APIKey}`);
-            if (!res.ok) throw new Error("Geo weather failed");
-            const data = await res.json();
-            const niceName = await reverseGeocode(latitude, longitude);
-            document.querySelector(".city").innerHTML = niceName || data.name;
-            document.querySelector(".temp").innerHTML = formatTemp(data.main.temp);
-            document.querySelector(".humidity").innerHTML = data.main.humidity + "%";
-            document.querySelector(".wind").innerHTML = formatWind(data.wind.speed) + ` (Bft ${beaufortFromMps(data.wind.speed)})`;
-            const winddirEl2 = document.querySelector('.winddir');
-            if (winddirEl2 && typeof data.wind.deg === 'number') winddirEl2.textContent = degToWindDir(data.wind.deg);
-            const visEl2 = document.querySelector('.visibility');
-            if (visEl2 && typeof data.visibility === 'number') visEl2.textContent = (data.visibility/1000).toFixed(1) + ' km';
-            const presEl2 = document.querySelector('.pressure');
-            if (presEl2 && data.main && typeof data.main.pressure === 'number') presEl2.textContent = data.main.pressure + ' hPa';
-            const feelsEl = document.querySelector('.feels');
-            if (feelsEl && data.main && typeof data.main.feels_like === 'number') {
-                feelsEl.textContent = formatTemp(data.main.feels_like);
+            // When precise fix arrives, update if it's meaningfully different/better
+            const precisePos = await precisePromise;
+            if (precisePos) {
+                const q = quickPos?.coords;
+                const p = precisePos.coords;
+                const dist = q ? haversineKm(q.latitude, q.longitude, p.latitude, p.longitude) : Infinity;
+                const accImproved = q && typeof q.accuracy === 'number' && typeof p.accuracy === 'number' ? (p.accuracy + 50 < q.accuracy) : true;
+                if (!quickPos || dist > 0.3 || accImproved) {
+                    await updateByCoords(p.latitude, p.longitude);
+                    lastQuery = { type: 'coords', city: null, lat: p.latitude, lon: p.longitude };
+                    startAutoRefresh();
+                }
             }
-            weatherIcon.src = getIconForMain(data.weather[0].main);
-            if (data.weather && data.weather[0] && data.weather[0].description) {
-                const d = data.weather[0].description;
-                const descEl = document.querySelector('.desc');
-                if (descEl) descEl.textContent = d.charAt(0).toUpperCase() + d.slice(1);
-            }
-            if (weatherEl) {
-                weatherEl.style.display = "block";
-                weatherEl.classList.remove("show");
-                void weatherEl.offsetWidth;
-                weatherEl.classList.add("show");
-            }
-            const updatedAt = document.querySelector('.updated-at');
-            if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-            lastSys = data.sys || null;
-            lastCoord = data.coord || { lat: latitude, lon: longitude };
-            updateAstro(lastSys, lastCoord);
-            renderForecastByCoords(latitude, longitude);
-            // Remember last coords and (re)start auto refresh
-            lastQuery = { type: 'coords', city: null, lat: latitude, lon: longitude };
-            startAutoRefresh();
         } catch (e) {
             if (errorEl) errorEl.style.display = "block";
             console.error(e);
@@ -476,16 +456,22 @@ function haversineKm(lat1, lon1, lat2, lon2){
 
 async function reverseGeocode(lat, lon) {
     try {
-        const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=5&appid=${APIKey}`);
+        const res = await fetch(`${reverseGeoUrl}?lat=${lat}&lon=${lon}&limit=10&appid=${APIKey}`);
         if (!res.ok) return null;
         const data = await res.json();
         if (Array.isArray(data) && data.length) {
-            // Prefer broader city/town first like earlier behavior
-            const preferOrder = [ 'city', 'town', 'village', 'municipality', 'state', 'county' ];
-            let chosen = data.find(p => preferOrder.includes(p?.type));
-            if (!chosen) chosen = data[0];
-            const localName = chosen.local_names && chosen.local_names.nl ? chosen.local_names.nl : chosen.name;
-            return localName || chosen.name || null;
+            // Prefer closest of desired types; fallback to globally closest
+            const preferOrder = [ 'city', 'town', 'village', 'municipality' ];
+            const withDist = data.map(p => ({
+                p,
+                dist: (typeof p.lat === 'number' && typeof p.lon === 'number') ? haversineKm(lat, lon, p.lat, p.lon) : Infinity
+            }));
+            const preferred = withDist.filter(x => preferOrder.includes(x.p?.type));
+            const candidates = preferred.length ? preferred : withDist;
+            candidates.sort((a,b) => a.dist - b.dist);
+            const chosen = candidates[0]?.p || data[0];
+            const localNameNl = chosen.local_names && chosen.local_names.nl ? chosen.local_names.nl : null;
+            return localNameNl || chosen.name || null;
         }
         return null;
     } catch {
