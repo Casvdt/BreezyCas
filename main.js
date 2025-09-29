@@ -253,60 +253,96 @@ searchBox.addEventListener("keydown", (event) => {
 })
 
 // Geolocation
-if (geoBtn && navigator.geolocation) {
-    geoBtn.addEventListener("click", () => {
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const { latitude, longitude } = pos.coords;
-            try {
-                if (loadingEl) loadingEl.classList.add("show");
-                if (errorEl) errorEl.style.display = "none";
-                if (weatherEl) weatherEl.style.display = "none";
-                const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?units=metric&lang=nl&lat=${latitude}&lon=${longitude}&appid=${APIKey}`);
-                if (!res.ok) throw new Error("Geo weather failed");
-                const data = await res.json();
-                const niceName = await reverseGeocode(latitude, longitude);
-                document.querySelector(".city").innerHTML = niceName || data.name;
-                document.querySelector(".temp").innerHTML = formatTemp(data.main.temp);
-                document.querySelector(".humidity").innerHTML = data.main.humidity + "%";
-                document.querySelector(".wind").innerHTML = formatWind(data.wind.speed) + ` (Bft ${beaufortFromMps(data.wind.speed)})`;
-                const winddirEl2 = document.querySelector('.winddir');
-                if (winddirEl2 && typeof data.wind.deg === 'number') winddirEl2.textContent = degToWindDir(data.wind.deg);
-                const visEl2 = document.querySelector('.visibility');
-                if (visEl2 && typeof data.visibility === 'number') visEl2.textContent = (data.visibility/1000).toFixed(1) + ' km';
-                const presEl2 = document.querySelector('.pressure');
-                if (presEl2 && data.main && typeof data.main.pressure === 'number') presEl2.textContent = data.main.pressure + ' hPa';
-                const feelsEl = document.querySelector('.feels');
-                if (feelsEl && data.main && typeof data.main.feels_like === 'number') {
-                    feelsEl.textContent = formatTemp(data.main.feels_like);
-                }
-                weatherIcon.src = getIconForMain(data.weather[0].main);
-                if (data.weather && data.weather[0] && data.weather[0].description) {
-                    const d = data.weather[0].description;
-                    const descEl = document.querySelector('.desc');
-                    if (descEl) descEl.textContent = d.charAt(0).toUpperCase() + d.slice(1);
-                }
-                if (weatherEl) {
-                    weatherEl.style.display = "block";
-                    weatherEl.classList.remove("show");
-                    void weatherEl.offsetWidth;
-                    weatherEl.classList.add("show");
-                }
-                const updatedAt = document.querySelector('.updated-at');
-                if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-                updateAstro(data.sys, data.coord);
-                renderForecastByCoords(latitude, longitude);
-                // Remember last coords and (re)start auto refresh
-                lastQuery = { type: 'coords', city: null, lat: latitude, lon: longitude };
-                startAutoRefresh();
-            } catch (e) {
-                if (errorEl) errorEl.style.display = "block";
-                console.error(e);
-            } finally {
-                if (loadingEl) loadingEl.classList.remove("show");
+// Helper: get a more precise position by waiting for an accurate reading
+async function getPrecisePosition({
+    desiredAccuracy = 100, // meters
+    timeoutMs = 12000,
+    maximumAge = 0
+} = {}) {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) return reject(new Error('Geolocation unsupported'));
+        let best = null;
+        const options = { enableHighAccuracy: true, timeout: timeoutMs, maximumAge };
+        const watcher = navigator.geolocation.watchPosition((pos) => {
+            const acc = typeof pos.coords.accuracy === 'number' ? pos.coords.accuracy : Infinity;
+            if (!best || acc < best.coords.accuracy) best = pos;
+            if (acc <= desiredAccuracy) {
+                navigator.geolocation.clearWatch(watcher);
+                resolve(pos);
             }
-        }, () => {
-            // If denied, do nothing
-        });
+        }, (err) => {
+            navigator.geolocation.clearWatch(watcher);
+            reject(err);
+        }, options);
+        // Safety timeout: resolve with best-so-far after timeout
+        setTimeout(() => {
+            try { navigator.geolocation.clearWatch(watcher); } catch {}
+            if (best) resolve(best); else reject(new Error('Geolocation timeout'));
+        }, timeoutMs + 1000);
+    });
+}
+
+if (geoBtn && navigator.geolocation) {
+    geoBtn.addEventListener("click", async () => {
+        try {
+            if (loadingEl) loadingEl.classList.add("show");
+            if (errorEl) errorEl.style.display = "none";
+            if (weatherEl) weatherEl.style.display = "none";
+
+            // Attempt to get a precise position first, fallback to single reading
+            let pos;
+            try {
+                pos = await getPrecisePosition({ desiredAccuracy: 100, timeoutMs: 12000, maximumAge: 0 });
+            } catch (e) {
+                pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+                });
+            }
+
+            const { latitude, longitude } = pos.coords;
+            const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?units=metric&lang=nl&lat=${latitude}&lon=${longitude}&appid=${APIKey}`);
+            if (!res.ok) throw new Error("Geo weather failed");
+            const data = await res.json();
+            const niceName = await reverseGeocode(latitude, longitude);
+            document.querySelector(".city").innerHTML = niceName || data.name;
+            document.querySelector(".temp").innerHTML = formatTemp(data.main.temp);
+            document.querySelector(".humidity").innerHTML = data.main.humidity + "%";
+            document.querySelector(".wind").innerHTML = formatWind(data.wind.speed) + ` (Bft ${beaufortFromMps(data.wind.speed)})`;
+            const winddirEl2 = document.querySelector('.winddir');
+            if (winddirEl2 && typeof data.wind.deg === 'number') winddirEl2.textContent = degToWindDir(data.wind.deg);
+            const visEl2 = document.querySelector('.visibility');
+            if (visEl2 && typeof data.visibility === 'number') visEl2.textContent = (data.visibility/1000).toFixed(1) + ' km';
+            const presEl2 = document.querySelector('.pressure');
+            if (presEl2 && data.main && typeof data.main.pressure === 'number') presEl2.textContent = data.main.pressure + ' hPa';
+            const feelsEl = document.querySelector('.feels');
+            if (feelsEl && data.main && typeof data.main.feels_like === 'number') {
+                feelsEl.textContent = formatTemp(data.main.feels_like);
+            }
+            weatherIcon.src = getIconForMain(data.weather[0].main);
+            if (data.weather && data.weather[0] && data.weather[0].description) {
+                const d = data.weather[0].description;
+                const descEl = document.querySelector('.desc');
+                if (descEl) descEl.textContent = d.charAt(0).toUpperCase() + d.slice(1);
+            }
+            if (weatherEl) {
+                weatherEl.style.display = "block";
+                weatherEl.classList.remove("show");
+                void weatherEl.offsetWidth;
+                weatherEl.classList.add("show");
+            }
+            const updatedAt = document.querySelector('.updated-at');
+            if (updatedAt) updatedAt.textContent = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+            updateAstro(data.sys, data.coord);
+            renderForecastByCoords(latitude, longitude);
+            // Remember last coords and (re)start auto refresh
+            lastQuery = { type: 'coords', city: null, lat: latitude, lon: longitude };
+            startAutoRefresh();
+        } catch (e) {
+            if (errorEl) errorEl.style.display = "block";
+            console.error(e);
+        } finally {
+            if (loadingEl) loadingEl.classList.remove("show");
+        }
     });
 }
 
