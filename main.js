@@ -1,5 +1,5 @@
-const url = "https://api.openweathermap.org/data/2.5/weather?units=metric&lang=nl&q=";
-const forecastUrl = "https://api.openweathermap.org/data/2.5/forecast?units=metric&lang=nl&q=";
+const url = "https://api.openweathermap.org/data/2.5/weather?units=metric&q=";
+const forecastUrl = "https://api.openweathermap.org/data/2.5/forecast?units=metric&q=";
 const reverseGeoUrl = "https://api.openweathermap.org/geo/1.0/reverse";
 
 // Import API key from config
@@ -28,6 +28,10 @@ const hourRightBtn = document.querySelector(".hour-right")
 
 // Units state
 let currentUnits = localStorage.getItem('units') || 'metric'; // 'metric' | 'imperial'
+// Language state for API localization
+let currentLang = 'en';
+function getApiLang(){ return currentLang === 'nl' ? 'nl' : 'en'; }
+function getLocale(){ return currentLang === 'nl' ? 'nl-NL' : 'en-GB'; }
 
 function toF(c) { return Math.round((c * 9/5) + 32); }
 function mpsToKmh(ms) { return Math.round(ms * 3.6); }
@@ -51,8 +55,8 @@ function updateAstro(sys, coord) {
     if (!sys) return;
     const sunriseEl = document.querySelector('.sunrise-time');
     const sunsetEl = document.querySelector('.sunset-time');
-    if (sunriseEl && sys.sunrise) sunriseEl.textContent = new Date(sys.sunrise * 1000).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-    if (sunsetEl && sys.sunset) sunsetEl.textContent = new Date(sys.sunset * 1000).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    if (sunriseEl && sys.sunrise) sunriseEl.textContent = new Date(sys.sunrise * 1000).toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
+    if (sunsetEl && sys.sunset) sunsetEl.textContent = new Date(sys.sunset * 1000).toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
     // UV requires One Call API; placeholder '-' unless we add that endpoint later
 }
 
@@ -98,7 +102,7 @@ async function checkWeather(city) {
         if (errorEl) errorEl.style.display = "none";
         if (weatherEl) weatherEl.style.display = "none";
 
-        const response = await fetch(url + encodeURIComponent(trimmedCity) + `&appid=${APIKey}`);
+        const response = await fetch(url + encodeURIComponent(trimmedCity) + `&lang=${getApiLang()}&appid=${APIKey}`);
 
         if (response.status === 404) {
             if (errorEl) errorEl.style.display = "block";
@@ -182,7 +186,7 @@ async function checkWeather(city) {
 async function renderForecastByCity(city) {
     if (!forecastGridEl) return;
     try {
-        const res = await fetch(forecastUrl + encodeURIComponent(city) + `&appid=${APIKey}`);
+        const res = await fetch(forecastUrl + encodeURIComponent(city) + `&lang=${getApiLang()}&appid=${APIKey}`);
         if (!res.ok) throw new Error("Forecast request failed");
         const data = await res.json();
         // Update precip chance in details from the next forecast slice if available
@@ -336,7 +340,7 @@ if (geoBtn && navigator.geolocation) {
 async function renderForecastByCoords(lat, lon) {
     if (!forecastGridEl) return;
     try {
-        const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?units=metric&lang=nl&lat=${lat}&lon=${lon}&appid=${APIKey}`);
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?units=metric&lang=${getApiLang()}&lat=${lat}&lon=${lon}&appid=${APIKey}`);
         if (!res.ok) throw new Error("Forecast request failed");
         const data = await res.json();
         const precipEl = document.querySelector('.precip');
@@ -391,7 +395,7 @@ async function updateByCoords(lat, lon) {
         if (loadingEl) loadingEl.classList.add("show");
         if (errorEl) errorEl.style.display = "none";
         if (weatherEl) weatherEl.style.display = "none";
-        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?units=metric&lang=nl&lat=${lat}&lon=${lon}&appid=${APIKey}`);
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?units=metric&lang=${getApiLang()}&lat=${lat}&lon=${lon}&appid=${APIKey}`);
         if (!res.ok) throw new Error("Geo weather failed");
         const data = await res.json();
         const niceName = await reverseGeocode(lat, lon);
@@ -470,8 +474,9 @@ async function reverseGeocode(lat, lon) {
             const candidates = preferred.length ? preferred : withDist;
             candidates.sort((a,b) => a.dist - b.dist);
             const chosen = candidates[0]?.p || data[0];
-            const localNameNl = chosen.local_names && chosen.local_names.nl ? chosen.local_names.nl : null;
-            return localNameNl || chosen.name || null;
+            const locNames = chosen.local_names || {};
+            const localized = locNames[currentLang] || locNames[getApiLang()] || null;
+            return localized || chosen.name || null;
         }
         return null;
     } catch {
@@ -624,10 +629,14 @@ function applyLanguage(lang) {
     langBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.lang === lang));
     try { localStorage.setItem('preferred_lang', lang); } catch {}
     try { document.documentElement.setAttribute('lang', lang); } catch {}
+    // Sync current language for API/localization
+    currentLang = (lang === 'nl' ? 'nl' : 'en');
     // Re-render dynamic astro texts after language replacement resets innerHTML
     if (lastSys) {
         updateAstro(lastSys, lastCoord);
     }
+    // Re-fetch current weather/forecast to localize description and other API-provided strings
+    refreshCurrent();
 }
 
 if (langBtns.length) {
