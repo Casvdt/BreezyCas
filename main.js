@@ -262,78 +262,22 @@ searchBox.addEventListener("keydown", (event) => {
 })
 
 // Geolocation
-// Helper: get a more precise position by waiting for an accurate reading
-async function getPrecisePosition({
-    desiredAccuracy = 100, // meters
-    timeoutMs = 12000,
-    maximumAge = 0
-} = {}) {
-    return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) return reject(new Error('Geolocation unsupported'));
-        let best = null;
-        const options = { enableHighAccuracy: true, timeout: timeoutMs, maximumAge };
-        const watcher = navigator.geolocation.watchPosition((pos) => {
-            const acc = typeof pos.coords.accuracy === 'number' ? pos.coords.accuracy : Infinity;
-            if (!best || acc < best.coords.accuracy) best = pos;
-            if (acc <= desiredAccuracy) {
-                navigator.geolocation.clearWatch(watcher);
-                resolve(pos);
-            }
-        }, (err) => {
-            navigator.geolocation.clearWatch(watcher);
-            reject(err);
-        }, options);
-        // Safety timeout: resolve with best-so-far after timeout
-        setTimeout(() => {
-            try { navigator.geolocation.clearWatch(watcher); } catch {}
-            if (best) resolve(best); else reject(new Error('Geolocation timeout'));
-        }, timeoutMs + 1000);
-    });
-}
-
 if (geoBtn && navigator.geolocation) {
-    geoBtn.addEventListener("click", async () => {
-        if (errorEl) errorEl.style.display = "none";
-        // Quick first fix using cached/network location for speed
-        let quickPos = null;
-        try {
-            quickPos = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 300000, timeout: 5000 });
-            });
-        } catch {}
-
-        // Start precise fix in background
-        const precisePromise = getPrecisePosition({ desiredAccuracy: 50, timeoutMs: 15000, maximumAge: 0 }).catch(() => null);
-
-        try {
-            if (quickPos) {
-                // Render quickly
-                await updateByCoords(quickPos.coords.latitude, quickPos.coords.longitude);
-                lastQuery = { type: 'coords', city: null, lat: quickPos.coords.latitude, lon: quickPos.coords.longitude };
+    geoBtn.addEventListener("click", () => {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            try {
+                await updateByCoords(latitude, longitude);
+                // Remember last coords and (re)start auto refresh
+                lastQuery = { type: 'coords', city: null, lat: latitude, lon: longitude };
                 startAutoRefresh();
-            } else {
-                if (loadingEl) loadingEl.classList.add("show");
+            } catch (e) {
+                if (errorEl) errorEl.style.display = "block";
+                console.error(e);
             }
-
-            // When precise fix arrives, update if it's meaningfully different/better
-            const precisePos = await precisePromise;
-            if (precisePos) {
-                const q = quickPos?.coords;
-                const p = precisePos.coords;
-                const dist = q ? haversineKm(q.latitude, q.longitude, p.latitude, p.longitude) : Infinity;
-                const accImproved = q && typeof q.accuracy === 'number' && typeof p.accuracy === 'number' ? (p.accuracy + 50 < q.accuracy) : true;
-                if (!quickPos || dist > 0.3 || accImproved) {
-                    await updateByCoords(p.latitude, p.longitude);
-                    lastQuery = { type: 'coords', city: null, lat: p.latitude, lon: p.longitude };
-                    startAutoRefresh();
-                }
-            }
-        } catch (e) {
-            if (errorEl) errorEl.style.display = "block";
-            console.error(e);
-        } finally {
-            if (loadingEl) loadingEl.classList.remove("show");
-        }
+        }, () => {
+            // If denied, do nothing
+        });
     });
 }
 
